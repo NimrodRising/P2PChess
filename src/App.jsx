@@ -1,8 +1,10 @@
+import ChessBoard from "./components/ChessBoard";
+
 function App() {
   return (
-    <>
-      <div>yo</div>
-    </>
+    <div className="flex justify-center items-center h-screen">
+      <ChessBoard />
+    </div>
   );
 }
 
