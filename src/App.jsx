@@ -17,12 +17,7 @@ function App() {
   }, []);
 
   return (
-    <div
-      onMouseUp={() => {
-        setIsDragging(false);
-      }}
-      className="flex justify-center items-center h-screen"
-    >
+    <div className="flex justify-center items-center h-screen">
       <ChessBoard
         isDragging={isDragging}
         setIsDragging={setIsDragging}
