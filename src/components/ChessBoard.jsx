@@ -13,6 +13,28 @@ let initialBoard = [
   ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
 ];
 
+function pawnInfluence(board, from, side) {
+  const fromRank = from[0];
+  const fromFile = from[1];
+  const targetFile = fromFile;
+  let targetRank;
+  if (fromRank === 1 || fromRank === 6) {
+    targetRank = side === "w" ? fromRank + 2 : fromRank - 2;
+  } else {
+    targetRank = side === "w" ? fromRank + 1 : fromRank - 1;
+  }
+  const pawnInfluence = board.map((row, rank) =>
+    row.map((square, file) => {
+      if (rank === fromRank && file === fromFile) return "p";
+      if (rank === targetRank && file === targetFile) return "m";
+      return "";
+    })
+  );
+  return pawnInfluence;
+}
+
+pawnInfluence(initialBoard, [0, 1], "b");
+
 function generateLegalMoves(board, piece, from, side) {
   switch (piece) {
     case "wP":
