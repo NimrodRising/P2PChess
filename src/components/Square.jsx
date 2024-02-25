@@ -53,6 +53,7 @@ function Square({
     if (isDraggingPiece && isDragging) {
       setPieceInHand({
         piece: square.piece,
+        index: square.index,
         side: square.piece[0],
         from: [square.rank, square.file],
       });
@@ -82,7 +83,9 @@ function Square({
 
   return (
     <div
-      onMouseDown={() => setLegalMoves(null)}
+      onMouseDown={() => {
+        setLegalMoves(null);
+      }}
       onMouseEnter={() => {
         setIsHovered(true);
       }}

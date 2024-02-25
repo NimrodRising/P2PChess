@@ -1,66 +1,126 @@
 import { useState } from "react";
 import Square from "./Square";
 import { useEffect } from "react";
+import {
+  generateBlackPawnMoves,
+  generateWhitePawnMoves,
+  pieceBitboards,
+} from "./MoveGen/moveGeneration";
 
 let initialBoard = [
-  ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+  ["wR", "wN", "wB", "wK", "wQ", "wB", "wN", "wR"],
   ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
-  ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
+  ["bR", "bN", "bB", "bK", "bQ", "bB", "bN", "bR"],
 ];
 
-function pawnInfluence(board, from, side) {
-  const fromRank = from[0];
-  const fromFile = from[1];
-  const targetFile = fromFile;
-  let targetRank;
-  if (fromRank === 1 || fromRank === 6) {
-    targetRank = side === "w" ? fromRank + 2 : fromRank - 2;
-  } else {
-    targetRank = side === "w" ? fromRank + 1 : fromRank - 1;
+function binaryStringToBigInt(binaryString) {
+  const chunkSize = 32;
+  const chunks = [];
+
+  for (let i = 0; i < binaryString.length; i += chunkSize) {
+    chunks.push(binaryString.slice(i, i + chunkSize));
   }
-  const pawnInfluence = board.map((row, rank) =>
-    row.map((square, file) => {
-      if (rank === fromRank && file === fromFile) return "p";
-      if (rank === targetRank && file === targetFile) return "m";
-      return "";
-    })
-  );
-  return pawnInfluence;
+
+  return chunks.reduce((result, chunk) => {
+    return (result << BigInt(chunk.length)) + BigInt("0b" + chunk);
+  }, 0n);
 }
 
-pawnInfluence(initialBoard, [0, 1], "b");
+function generateAllPieceBitboard(board) {
+  let binaryStr = "";
+  for (const row of board) {
+    for (const el of row) {
+      if (el.length === 0 || !el.includes("P")) {
+        binaryStr += "0";
+      } else {
+        binaryStr += "1";
+      }
+    }
+  }
 
-function generateLegalMoves(board, piece, from, side) {
+  let bitBoard = binaryStringToBigInt(binaryStr);
+  return bitBoard;
+}
+
+function generateColoredBitboard(board, color) {
+  let binaryStr = "";
+  for (const row of board) {
+    for (const el of row) {
+      if (el.includes(color) && el.includes("P")) {
+        binaryStr += "1";
+      } else {
+        binaryStr += "0";
+      }
+    }
+  }
+
+  let bitBoard = binaryStringToBigInt(binaryStr);
+  return bitBoard;
+}
+
+function bitboardToList(bitboard) {
+  let binaryStr = bitboard.toString(2);
+  const numLeadingZeroes = 64 - binaryStr.length;
+  console.log("num leading:");
+  console.log(numLeadingZeroes);
+  const zeroStr = "0";
+  binaryStr = zeroStr.repeat(numLeadingZeroes) + binaryStr;
+  let legalMoves = [];
+  let index, file, rank, newIndex;
+  for (const el of binaryStr) {
+    if (el === "1") {
+      index = binaryStr.indexOf(el);
+
+      file = Math.floor(index / 8);
+      rank = 7 - (index % 8);
+      newIndex = 8 * rank + file;
+
+      legalMoves.push([file, rank]);
+    }
+  }
+  return legalMoves;
+}
+function generateLegalMoves(board, pieceInHand) {
+  let file = pieceInHand.index - Math.floor(pieceInHand.index / 8) * 8;
+  let rank = 7 - Math.floor(pieceInHand.index / 8);
+  const newIndex = 8 * rank + file;
+  let legalMovesBitboard;
+  const whitePawnsAll = generateColoredBitboard(board, "w");
+  const blackPawnsAll = generateColoredBitboard(board, "b");
+  const blackPieces = generateColoredBitboard(board, "b");
+  const whitePieces = generateColoredBitboard(board, "w");
+  const allPieces = generateAllPieceBitboard(board);
+  const piece = pieceInHand.piece;
   switch (piece) {
     case "wP":
+      legalMovesBitboard = generateWhitePawnMoves(
+        whitePawnsAll,
+        blackPieces,
+        allPieces,
+        pieceBitboards[newIndex]
+      );
+      break;
+    // convertBitBoard to list of coords and return
     case "bP":
-      return pawnMoves(board, from, side);
+      legalMovesBitboard = generateBlackPawnMoves(
+        blackPawnsAll,
+        whitePieces,
+        allPieces,
+        pieceBitboards[newIndex]
+      );
+      // convertBitBoard to list of coords and return
+      break;
     default:
-      return [];
+      legalMovesBitboard = 0b0n;
+      break;
   }
-}
-
-function pawnMoves(board, from, side) {
-  if (side === "w") {
-    let legalMoves = [];
-    const nextRank = from[0] + 1;
-    if (nextRank > 7 || board[nextRank][from[1]]) return legalMoves;
-    legalMoves.push([nextRank, from[1]]);
-    if (nextRank === 2) legalMoves.push([nextRank + 1, from[1]]);
-    return legalMoves;
-  } else {
-    let legalMoves = [];
-    const nextRank = from[0] - 1;
-    if (nextRank < 0 || board[nextRank][from[1]]) return legalMoves;
-    legalMoves.push([nextRank, from[1]]);
-    if (nextRank === 5) legalMoves.push([nextRank - 1, from[1]]);
-    return legalMoves;
-  }
+  const legalMoves = bitboardToList(legalMovesBitboard);
+  return legalMoves;
 }
 
 function arraysEqual(a1, a2) {
@@ -90,14 +150,7 @@ function ChessBoard({ mousePos, isDragging, setIsDragging }) {
         ...pieceInHand,
         to: hovered,
       });
-      setLegalMoves(
-        generateLegalMoves(
-          board,
-          pieceInHand.piece,
-          pieceInHand.from,
-          pieceInHand.side
-        )
-      );
+      setLegalMoves(generateLegalMoves(board, pieceInHand));
       setPieceInHand(null);
     }
     if (move && !isDragging) {
@@ -145,6 +198,7 @@ function ChessBoard({ mousePos, isDragging, setIsDragging }) {
             mousePos={mousePos}
             key={index}
             square={{
+              index: index,
               rank: Math.floor(index / 8),
               file: index % 8,
               piece: piece,
