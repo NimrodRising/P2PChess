@@ -6,17 +6,93 @@ import {
   generateWhitePawnMoves,
   pieceBitboards,
 } from "./MoveGen/moveGeneration";
-
-let initialBoard = [
-  ["wR", "wN", "wB", "wK", "wQ", "wB", "wN", "wR"],
-  ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-  ["", "", "", "", "", "", "", ""],
-  ["", "", "", "", "", "", "", ""],
-  ["", "", "", "", "", "", "", ""],
-  ["", "", "", "", "", "", "", ""],
-  ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
-  ["bR", "bN", "bB", "bK", "bQ", "bB", "bN", "bR"],
+const initialBoard = [
+  "bR",
+  "bN",
+  "bB",
+  "bQ",
+  "bK",
+  "bB",
+  "bN",
+  "bR",
+  "bP",
+  "bP",
+  "bP",
+  "bP",
+  "bP",
+  "bP",
+  "bP",
+  "bP",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "wP",
+  "wP",
+  "wP",
+  "wP",
+  "wP",
+  "wP",
+  "wP",
+  "wP",
+  "wR",
+  "wN",
+  "wB",
+  "wQ",
+  "wK",
+  "wB",
+  "wN",
+  "wR",
 ];
+
+function ChessBoard() {
+  const [board, setBoard] = useState(initialBoard);
+  return (
+    <div className="border w-2/3 max-w-screen-sm border-black">
+      <div className=" grid grid-cols-8">
+        {board.map((piece, index) => (
+          <Square
+            key={index}
+            square={{
+              index: index,
+              rank: Math.floor(index / 8),
+              file: index % 8,
+              piece: piece,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function binaryStringToBigInt(binaryString) {
   const chunkSize = 32;
@@ -66,8 +142,6 @@ function generateColoredBitboard(board, color) {
 function bitboardToList(bitboard) {
   let binaryStr = bitboard.toString(2);
   const numLeadingZeroes = 64 - binaryStr.length;
-  console.log("num leading:");
-  console.log(numLeadingZeroes);
   const zeroStr = "0";
   binaryStr = zeroStr.repeat(numLeadingZeroes) + binaryStr;
   let legalMoves = [];
@@ -75,16 +149,18 @@ function bitboardToList(bitboard) {
   for (const el of binaryStr) {
     if (el === "1") {
       index = binaryStr.indexOf(el);
-
-      file = Math.floor(index / 8);
-      rank = 7 - (index % 8);
+      file = 7 - (index % 8);
+      rank = Math.floor(index / 8);
       newIndex = 8 * rank + file;
-
-      legalMoves.push([file, rank]);
+      console.log(
+        `Old Index: ${index} New Index: ${newIndex} \n Rank: ${rank} File: ${file}`
+      );
+      legalMoves.push([rank, file]);
     }
   }
   return legalMoves;
 }
+
 function generateLegalMoves(board, pieceInHand) {
   let file = pieceInHand.index - Math.floor(pieceInHand.index / 8) * 8;
   let rank = 7 - Math.floor(pieceInHand.index / 8);
@@ -98,7 +174,7 @@ function generateLegalMoves(board, pieceInHand) {
   const piece = pieceInHand.piece;
   switch (piece) {
     case "wP":
-      legalMovesBitboard = generateWhitePawnMoves(
+      legalMovesBitboard = generateBlackPawnMoves(
         whitePawnsAll,
         blackPieces,
         allPieces,
@@ -107,7 +183,17 @@ function generateLegalMoves(board, pieceInHand) {
       break;
     // convertBitBoard to list of coords and return
     case "bP":
-      legalMovesBitboard = generateBlackPawnMoves(
+      console.log("black pawn recognized");
+      console.log(
+        blackPawnsAll.toString(2),
+        "\n",
+        whitePieces.toString(2),
+        "\n",
+        allPieces.toString(2),
+        "\n",
+        pieceBitboards[newIndex].toString(2)
+      );
+      legalMovesBitboard = generateWhitePawnMoves(
         blackPawnsAll,
         whitePieces,
         allPieces,
@@ -119,6 +205,7 @@ function generateLegalMoves(board, pieceInHand) {
       legalMovesBitboard = 0b0n;
       break;
   }
+  console.log(legalMovesBitboard.toString(2));
   const legalMoves = bitboardToList(legalMovesBitboard);
   return legalMoves;
 }
@@ -135,79 +222,6 @@ function containsSubArray(arr, subArr) {
     }
   }
   return false;
-}
-
-function ChessBoard({ mousePos, isDragging, setIsDragging }) {
-  const [board, setBoard] = useState(initialBoard);
-  const [move, setMove] = useState(null);
-  const [hovered, setHovered] = useState(null);
-  const [pieceInHand, setPieceInHand] = useState(null);
-  const [legalMoves, setLegalMoves] = useState(null);
-
-  useEffect(() => {
-    if (pieceInHand) {
-      setMove({
-        ...pieceInHand,
-        to: hovered,
-      });
-      setLegalMoves(generateLegalMoves(board, pieceInHand));
-      setPieceInHand(null);
-    }
-    if (move && !isDragging) {
-      if (containsSubArray(legalMoves, [move.to[0], move.to[1]])) {
-        setBoard((currBoard) => {
-          // Create a deep copy of the current board
-          const newBoard = JSON.parse(JSON.stringify(currBoard));
-
-          // Update the "from" square to empty
-          newBoard[move.from[0]][move.from[1]] = "";
-
-          // Update the "to" square with the moved piece
-          newBoard[move.to[0]][move.to[1]] = move.piece;
-
-          return newBoard;
-        });
-      }
-    }
-  }, [move, isDragging, pieceInHand]);
-  return (
-    <div
-      onMouseUp={() => {
-        setIsDragging(false);
-      }}
-      className="border w-2/3 max-w-screen-sm border-black"
-    >
-      <div className=" grid grid-cols-8">
-        {[].concat(...board).map((piece, index) => (
-          <Square
-            isLegalSquare={
-              legalMoves
-                ? containsSubArray(legalMoves, [
-                    Math.floor(index / 8),
-                    index % 8,
-                  ])
-                : false
-            }
-            setLegalMoves={setLegalMoves}
-            setPieceInHand={setPieceInHand}
-            hovered={hovered}
-            setHovered={setHovered}
-            setMove={setMove}
-            setIsDragging={setIsDragging}
-            isDragging={isDragging}
-            mousePos={mousePos}
-            key={index}
-            square={{
-              index: index,
-              rank: Math.floor(index / 8),
-              file: index % 8,
-              piece: piece,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export default ChessBoard;
