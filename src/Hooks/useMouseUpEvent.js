@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 
-const useMouseUpEvent = () => {
+const useMouseUpEvent = (bool) => {
   const [event, setEvent] = useState(null);
 
   useEffect(() => {
     function setFromEvent(event) {
       setEvent(event);
     }
-    window.addEventListener("mouseup", setFromEvent);
+    bool && window.addEventListener("mouseup", setFromEvent);
     return () => {
-      window.removeEventListener("mouseup", setFromEvent);
+      bool && window.removeEventListener("mouseup", setFromEvent);
     };
-  }, [event]);
+  }, [bool, event]);
   return event;
 };
 

@@ -1,53 +1,57 @@
-import { useEffect, useRef, useState } from "react";
-import useMousePosition from "../Hooks/useMousePosition";
+import { useEffect, useReducer } from "react";
 import usePieceIcon from "../Hooks/usePieceIcon";
-import useMouseUpEvent from "../Hooks/useMouseUpEvent";
+import useUserEvents from "../Hooks/useUserEvents";
+
+// initial State for reducer
+const initialState = {
+  isDraggingPiece: false,
+  domRect: null,
+  newPosition: [0, 0],
+};
 
 function PieceIcon({ piece }) {
-  const [isDraggingPiece, setIsDraggingPiece] = useState(false);
-  const position = useMousePosition(isDraggingPiece);
-  const [newPosition, setNewPosition] = useState([0, 0]);
+  // reducer
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  // custom hooks
+  const { userPosition, mouseupEvent } = useUserEvents(state.isDraggingPiece);
   const pieceIcon = usePieceIcon(piece);
-  const mouseup = useMouseUpEvent();
-  const [domRect, setDomRect] = useState(null);
-  const mousePositionRef = useRef(position);
 
   useEffect(() => {
-    mousePositionRef.current = position;
-  }, [position]);
-
-  useEffect(() => {
-    setIsDraggingPiece(false);
-    setDomRect(null);
-    setNewPosition([0, 0]);
-  }, [mouseup]);
-
-  useEffect(() => {
-    function handleDrag() {
-      const positionFromClick = [
-        -domRect.left - domRect.width / 2 + mousePositionRef.current.x,
-        -domRect.top - domRect.height / 2 + mousePositionRef.current.y,
-      ];
-
-      setNewPosition(positionFromClick);
-    }
-    if (domRect && position && isDraggingPiece) {
-      console.log("activated");
-      handleDrag();
-    } else {
-      setNewPosition([0, 0]);
-    }
-  }, [isDraggingPiece, position, domRect]);
+    dispatch({ type: "RESET" });
+  }, [mouseupEvent]);
 
   const handleMouseDown = (e) => {
-    setDomRect(e.target.getBoundingClientRect());
-    setIsDraggingPiece(true);
-    e.target.style.zIndex = 9999;
+    const domRect = e.target.getBoundingClientRect();
+    const updatedPosition = updatePosition(
+      domRect.left,
+      domRect.width,
+      domRect.top,
+      domRect.height,
+      userPosition,
+    );
+
+    dispatch({ type: "MOUSEDOWN", event: e, updatedPosition: updatedPosition });
   };
 
-  const style = {
-    transform: `translate(${newPosition[0]}px, ${newPosition[1]}px)`,
-  };
+  useEffect(() => {
+    if (state.domRect && userPosition && state.isDraggingPiece) {
+      const updatedPosition = updatePosition(
+        state.domRect.left,
+        state.domRect.width,
+        state.domRect.top,
+        state.domRect.height,
+        userPosition,
+      );
+      dispatch({ type: "POSITION_CHANGE", updatedPosition: updatedPosition });
+    }
+  }, [state.isDraggingPiece, userPosition, state.domRect]);
+
+  const style = state.isDraggingPiece
+    ? {
+        transform: `translate(${state.newPosition[0]}px, ${state.newPosition[1]}px)`,
+      }
+    : null;
 
   return piece ? (
     <img
@@ -59,6 +63,39 @@ function PieceIcon({ piece }) {
       alt=""
     />
   ) : null;
+}
+
+function updatePosition(left, width, top, height, userPosition) {
+  return [
+    -left - width / 2 + userPosition.x,
+    -top - height / 2 + userPosition.y,
+  ];
+}
+
+// reducer
+function reducer(state, action) {
+  switch (action.type) {
+    case "MOUSEDOWN": {
+      return {
+        ...state,
+        domRect: action.event.target.getBoundingClientRect(),
+        isDraggingPiece: true,
+        newPosition: action.updatedPosition,
+      };
+    }
+    case "RESET": {
+      return initialState;
+    }
+    case "POSITION_CHANGE": {
+      return {
+        ...state,
+        newPosition: action.updatedPosition,
+      };
+    }
+    default: {
+      throw new Error();
+    }
+  }
 }
 
 export default PieceIcon;

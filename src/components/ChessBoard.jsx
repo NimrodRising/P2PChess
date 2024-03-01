@@ -153,7 +153,7 @@ function bitboardToList(bitboard) {
       rank = Math.floor(index / 8);
       newIndex = 8 * rank + file;
       console.log(
-        `Old Index: ${index} New Index: ${newIndex} \n Rank: ${rank} File: ${file}`
+        `Old Index: ${index} New Index: ${newIndex} \n Rank: ${rank} File: ${file}`,
       );
       legalMoves.push([rank, file]);
     }
@@ -178,7 +178,7 @@ function generateLegalMoves(board, pieceInHand) {
         whitePawnsAll,
         blackPieces,
         allPieces,
-        pieceBitboards[newIndex]
+        pieceBitboards[newIndex],
       );
       break;
     // convertBitBoard to list of coords and return
@@ -191,13 +191,13 @@ function generateLegalMoves(board, pieceInHand) {
         "\n",
         allPieces.toString(2),
         "\n",
-        pieceBitboards[newIndex].toString(2)
+        pieceBitboards[newIndex].toString(2),
       );
       legalMovesBitboard = generateWhitePawnMoves(
         blackPawnsAll,
         whitePieces,
         allPieces,
-        pieceBitboards[newIndex]
+        pieceBitboards[newIndex],
       );
       // convertBitBoard to list of coords and return
       break;
