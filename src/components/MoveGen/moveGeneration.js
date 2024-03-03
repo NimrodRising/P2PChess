@@ -128,7 +128,13 @@ let allPieces = allWhitePieces | allBlackPieces;
 allPieces;
 
 function generateWhitePawnMoves(whitePawnsAll, blackPieces, allPieces, piece) {
+  console.log("white pawns all: ");
+  console.log(whitePawnsAll.toString(2));
+  console.log("piece");
+  console.log(piece.toString(2));
   const whitePawns = whitePawnsAll & piece;
+  console.log("white piece: ");
+  console.log(whitePawnsAll.toString(2));
   const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
   const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
   const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
@@ -136,7 +142,7 @@ function generateWhitePawnMoves(whitePawnsAll, blackPieces, allPieces, piece) {
   const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[7] & blackPieces;
   const whiteMoves = whiteSteps | whitePawnLeftAttacks | whitePawnRightAttacks;
 
-  return whiteMoves.toString(2);
+  return whiteMoves;
 }
 
 function generateBlackPawnMoves(blackPawnsAll, whitePieces, allPieces, piece) {
@@ -148,7 +154,7 @@ function generateBlackPawnMoves(blackPawnsAll, whitePieces, allPieces, piece) {
   const blackPawnRightAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
   const blackMoves = blackSteps | blackPawnLeftAttacks | blackPawnRightAttacks;
 
-  return blackMoves.toString(2);
+  return blackMoves;
 }
 
 export { generateBlackPawnMoves, generateWhitePawnMoves, pieceBitboards };

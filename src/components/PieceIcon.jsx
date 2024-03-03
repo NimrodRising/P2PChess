@@ -12,7 +12,6 @@ const initialState = {
 function PieceIcon({ piece }) {
   // reducer
   const [state, dispatch] = useReducer(reducer, initialState);
-
   // custom hooks
   const { userPosition, mouseupEvent } = useUserEvents(state.isDraggingPiece);
   const pieceIcon = usePieceIcon(piece);
@@ -58,7 +57,7 @@ function PieceIcon({ piece }) {
       style={style}
       draggable="false"
       onMouseDown={handleMouseDown}
-      className={`w-full select-none image`}
+      className={`w-full select-none image ${state.isDraggingPiece ? "pointer-events-none" : ""}`}
       src={pieceIcon}
       alt=""
     />

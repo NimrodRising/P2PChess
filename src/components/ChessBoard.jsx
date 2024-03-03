@@ -1,11 +1,24 @@
-import { useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import Square from "./Square";
-import { useEffect } from "react";
 import {
   generateBlackPawnMoves,
   generateWhitePawnMoves,
   pieceBitboards,
 } from "./MoveGen/moveGeneration";
+generateBlackPawnMoves;
+generateWhitePawnMoves;
+pieceBitboards;
+import {
+  doesContainSubArray,
+  arraysEqual,
+  binaryStringToBigInt,
+  toBitboard,
+  bitboardToList,
+} from "./utils.js";
+doesContainSubArray;
+arraysEqual;
+binaryStringToBigInt;
+
 const initialBoard = [
   "bR",
   "bN",
@@ -73,13 +86,45 @@ const initialBoard = [
   "wR",
 ];
 
+const initialBoardAction = {
+  isPondering: false,
+  to: null,
+  from: null,
+  piece: null,
+};
+
 function ChessBoard() {
   const [board, setBoard] = useState(initialBoard);
+  const [state, dispatch] = useReducer(reducer, initialBoardAction);
+  const [legalMoves, setLegalMoves] = useState([]);
+
+  useEffect(() => {
+    if (state.isPondering) {
+      const legalMoves = generateLegalMoves(state.piece, state.from, board);
+      setLegalMoves(legalMoves); // setting legal moves to highlight legal squares
+    }
+    if (!state.isPondering && state.to !== null) {
+      // setBoard(); // setting board using bitboard logic
+    }
+  }, [state, board]);
+
+  function handleGrab(index, piece) {
+    dispatch({ type: "GRAB_PIECE", from: index, piece: piece });
+  }
+
+  function handleDrop(index, piece) {
+    dispatch({ type: "DROP_PIECE", to: index });
+    setLegalMoves([]);
+  }
+
   return (
     <div className="border w-2/3 max-w-screen-sm border-black">
       <div className=" grid grid-cols-8">
         {board.map((piece, index) => (
           <Square
+            isLegal={legalMoves.includes(index)}
+            handleDrop={handleDrop}
+            handleGrab={handleGrab}
             key={index}
             square={{
               index: index,
@@ -94,134 +139,63 @@ function ChessBoard() {
   );
 }
 
-function binaryStringToBigInt(binaryString) {
-  const chunkSize = 32;
-  const chunks = [];
-
-  for (let i = 0; i < binaryString.length; i += chunkSize) {
-    chunks.push(binaryString.slice(i, i + chunkSize));
-  }
-
-  return chunks.reduce((result, chunk) => {
-    return (result << BigInt(chunk.length)) + BigInt("0b" + chunk);
-  }, 0n);
-}
-
-function generateAllPieceBitboard(board) {
-  let binaryStr = "";
-  for (const row of board) {
-    for (const el of row) {
-      if (el.length === 0 || !el.includes("P")) {
-        binaryStr += "0";
-      } else {
-        binaryStr += "1";
-      }
+// reducer function
+function reducer(state, action) {
+  switch (action.type) {
+    case "GRAB_PIECE": {
+      return {
+        ...state,
+        from: action.from,
+        isPondering: true,
+        piece: action.piece,
+      };
+    }
+    case "DROP_PIECE": {
+      return {
+        ...state,
+        to: action.to,
+        isPondering: false,
+      };
+    }
+    default: {
+      throw new Error("Unrecognized action type!");
     }
   }
-
-  let bitBoard = binaryStringToBigInt(binaryStr);
-  return bitBoard;
 }
 
-function generateColoredBitboard(board, color) {
-  let binaryStr = "";
-  for (const row of board) {
-    for (const el of row) {
-      if (el.includes(color) && el.includes("P")) {
-        binaryStr += "1";
-      } else {
-        binaryStr += "0";
-      }
-    }
-  }
-
-  let bitBoard = binaryStringToBigInt(binaryStr);
-  return bitBoard;
-}
-
-function bitboardToList(bitboard) {
-  let binaryStr = bitboard.toString(2);
-  const numLeadingZeroes = 64 - binaryStr.length;
-  const zeroStr = "0";
-  binaryStr = zeroStr.repeat(numLeadingZeroes) + binaryStr;
+function generateLegalMoves(piece, index, board) {
   let legalMoves = [];
-  let index, file, rank, newIndex;
-  for (const el of binaryStr) {
-    if (el === "1") {
-      index = binaryStr.indexOf(el);
-      file = 7 - (index % 8);
-      rank = Math.floor(index / 8);
-      newIndex = 8 * rank + file;
-      console.log(
-        `Old Index: ${index} New Index: ${newIndex} \n Rank: ${rank} File: ${file}`,
-      );
-      legalMoves.push([rank, file]);
-    }
-  }
-  return legalMoves;
-}
-
-function generateLegalMoves(board, pieceInHand) {
-  let file = pieceInHand.index - Math.floor(pieceInHand.index / 8) * 8;
-  let rank = 7 - Math.floor(pieceInHand.index / 8);
-  const newIndex = 8 * rank + file;
-  let legalMovesBitboard;
-  const whitePawnsAll = generateColoredBitboard(board, "w");
-  const blackPawnsAll = generateColoredBitboard(board, "b");
-  const blackPieces = generateColoredBitboard(board, "b");
-  const whitePieces = generateColoredBitboard(board, "w");
-  const allPieces = generateAllPieceBitboard(board);
-  const piece = pieceInHand.piece;
+  // the regex in allPieces matches all non space characters
+  const allPieces = toBitboard(/^(?!\s*$).+/, board);
+  const pieceBB = pieceBitboards[63 - index];
   switch (piece) {
-    case "wP":
-      legalMovesBitboard = generateBlackPawnMoves(
+    case "wP": {
+      const whitePawnsAll = toBitboard(/wP/, board);
+      const blackPieces = toBitboard(/b/, board);
+      const legalMovesBB = generateWhitePawnMoves(
         whitePawnsAll,
         blackPieces,
         allPieces,
-        pieceBitboards[newIndex],
+        pieceBB,
       );
-      break;
-    // convertBitBoard to list of coords and return
-    case "bP":
-      console.log("black pawn recognized");
-      console.log(
-        blackPawnsAll.toString(2),
-        "\n",
-        whitePieces.toString(2),
-        "\n",
-        allPieces.toString(2),
-        "\n",
-        pieceBitboards[newIndex].toString(2),
-      );
-      legalMovesBitboard = generateWhitePawnMoves(
+      return bitboardToList(legalMovesBB); // converts the bitboard of legal squares to list of legal squares (indeces)
+    }
+    case "bP": {
+      const blackPawnsAll = toBitboard(/bP/, board);
+      const whitePieces = toBitboard(/w/, board);
+      const legalMovesBB = generateBlackPawnMoves(
         blackPawnsAll,
         whitePieces,
         allPieces,
-        pieceBitboards[newIndex],
+        pieceBB,
       );
-      // convertBitBoard to list of coords and return
-      break;
-    default:
-      legalMovesBitboard = 0b0n;
-      break;
-  }
-  console.log(legalMovesBitboard.toString(2));
-  const legalMoves = bitboardToList(legalMovesBitboard);
-  return legalMoves;
-}
-
-function arraysEqual(a1, a2) {
-  /* WARNING: arrays must not contain {objects} or behavior may be undefined */
-  return JSON.stringify(a1) == JSON.stringify(a2);
-}
-
-function containsSubArray(arr, subArr) {
-  for (let el of arr) {
-    if (arraysEqual(el, subArr)) {
-      return true;
+      return bitboardToList(legalMovesBB); // converts the bitboard of legal squares to list of legal squares (indeces)
+    }
+    default: {
+      console.log("I haven't programmed legal moves for this piece type yet!");
     }
   }
-  return false;
+  return legalMoves;
 }
 
 export default ChessBoard;
