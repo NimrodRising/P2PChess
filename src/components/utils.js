@@ -34,7 +34,14 @@ function toBitboard(regex, board) {
 
 function bitboardToList(bitboard) {
   const binaryString = bitboard.toString(2);
-  const padding = "0".repeat(64 - binaryString.length);
+  let padding;
+  if (64 - binaryString.length < 0) {
+    throw new Error(
+      `binary String ${binaryString} exceeds allowed length by ${binaryString.length - 64}`,
+    );
+  } else {
+    padding = "0".repeat(64 - binaryString.length);
+  }
   const list = [...(padding + binaryString)].reduce((acc, char, index) => {
     if (char === "1") {
       acc.push(index);

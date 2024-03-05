@@ -3,7 +3,10 @@ import Square from "./Square";
 import {
   generateBlackPawnMoves,
   generateWhitePawnMoves,
+  generateBlackKingMovesNoCheckFilter,
   pieceBitboards,
+  generateWhiteKingMovesNoCheckFilter,
+  generateKnightMoves,
 } from "./MoveGen/moveGeneration";
 generateBlackPawnMoves;
 generateWhitePawnMoves;
@@ -104,8 +107,13 @@ function ChessBoard() {
       setLegalMoves(legalMoves); // setting legal moves to highlight legal squares
     }
     if (!state.isPondering && state.to !== null) {
-      // setBoard(); // setting board using bitboard logic
+      let boardCopy = [...board];
+      boardCopy[state.from] = "";
+      boardCopy[state.to] = state.piece;
+      setBoard(boardCopy);
+      dispatch({ type: "RESET" });
     }
+    console.log(board);
   }, [state, board]);
 
   function handleGrab(index, piece) {
@@ -113,7 +121,10 @@ function ChessBoard() {
   }
 
   function handleDrop(index, piece) {
-    dispatch({ type: "DROP_PIECE", to: index });
+    dispatch({
+      type: "DROP_PIECE",
+      to: legalMoves.includes(index) ? index : null,
+    });
     setLegalMoves([]);
   }
 
@@ -157,6 +168,11 @@ function reducer(state, action) {
         isPondering: false,
       };
     }
+    case "RESET": {
+      return {
+        ...initialBoardAction,
+      };
+    }
     default: {
       throw new Error("Unrecognized action type!");
     }
@@ -190,6 +206,48 @@ function generateLegalMoves(piece, index, board) {
         pieceBB,
       );
       return bitboardToList(legalMovesBB); // converts the bitboard of legal squares to list of legal squares (indeces)
+    }
+    case "bK": {
+      const allBlackPieces = toBitboard(/b/, board);
+      const blackKing = toBitboard(/bK/, board);
+      const legalMovesBB = generateBlackKingMovesNoCheckFilter(
+        blackKing,
+        allBlackPieces,
+      );
+
+      return bitboardToList(legalMovesBB);
+    }
+    case "wK": {
+      const allWhitePieces = toBitboard(/w/, board);
+      const whiteKing = toBitboard(/wK/, board);
+      const legalMovesBB = generateWhiteKingMovesNoCheckFilter(
+        whiteKing,
+        allWhitePieces,
+      );
+
+      return bitboardToList(legalMovesBB);
+    }
+    case "wN": {
+      const allWhitePieces = toBitboard(/w/, board);
+      const whiteKnights = toBitboard(/wN/, board);
+      const legalMovesBB = generateKnightMoves(
+        whiteKnights,
+        allWhitePieces,
+        pieceBB,
+      );
+
+      return bitboardToList(legalMovesBB);
+    }
+    case "bN": {
+      const allBlackPieces = toBitboard(/b/, board);
+      const blackKnights = toBitboard(/bN/, board);
+      const legalMovesBB = generateKnightMoves(
+        blackKnights,
+        allBlackPieces,
+        pieceBB,
+      );
+
+      return bitboardToList(legalMovesBB);
     }
     default: {
       console.log("I haven't programmed legal moves for this piece type yet!");

@@ -58,7 +58,7 @@ const pieceBitboards = [
   0b0000000100000000000000000000000000000000000000000000000000000000n,
   0b0000001000000000000000000000000000000000000000000000000000000000n,
   0b0000010000000000000000000000000000000000000000000000000000000000n,
-  0b000010000000000000000000000000000000000000000000000000000000000n,
+  0b0000100000000000000000000000000000000000000000000000000000000000n,
   0b0001000000000000000000000000000000000000000000000000000000000000n,
   0b0010000000000000000000000000000000000000000000000000000000000000n,
   0b0100000000000000000000000000000000000000000000000000000000000000n,
@@ -74,7 +74,6 @@ const maskRank = [
   0b0000000011111111000000000000000000000000000000000000000000000000n,
   0b1111111100000000000000000000000000000000000000000000000000000000n,
 ];
-
 const maskFile = [
   0b1000000010000000100000001000000010000000100000001000000010000000n,
   0b0100000001000000010000000100000001000000010000000100000001000000n,
@@ -127,21 +126,61 @@ let allBlackPieces =
 let allPieces = allWhitePieces | allBlackPieces;
 allPieces;
 
+function rayNorth(currentSquare, incompleteRay) {
+  const nextSquare = currentSquare << 8n;
+  if (nextSquare > BigInt(2 ** 63)) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return rayNorth(nextSquare, ray);
+  }
+}
+
+function rayWest(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare << 1n) & ~maskFile[7];
+  if (nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return rayWest(nextSquare, ray);
+  }
+}
+
+function raySouth(currentSquare, incompleteRay) {
+  const nextSquare = currentSquare >> 8n;
+  if (nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return raySouth(nextSquare, ray);
+  }
+}
+
+function rayEast(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare >> 1n) & ~maskFile[0];
+  if (nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return rayEast(nextSquare, ray);
+  }
+}
+
 function generateWhitePawnMoves(whitePawnsAll, blackPieces, allPieces, piece) {
-  console.log("white pawns all: ");
-  console.log(whitePawnsAll.toString(2));
-  console.log("piece");
-  console.log(piece.toString(2));
   const whitePawns = whitePawnsAll & piece;
-  console.log("white piece: ");
-  console.log(whitePawnsAll.toString(2));
   const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
   const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
   const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
-  const whitePawnLeftAttacks = (whitePawns << 9n) & ~maskFile[0] & blackPieces;
-  const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[7] & blackPieces;
+  const whitePawnLeftAttacks = (whitePawns << 9n) & ~maskFile[7] & blackPieces;
+  const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[0] & blackPieces;
   const whiteMoves = whiteSteps | whitePawnLeftAttacks | whitePawnRightAttacks;
 
+  if (
+    whiteMoves >
+    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n)
+  ) {
+    return 0b0n;
+  }
   return whiteMoves;
 }
 
@@ -150,11 +189,135 @@ function generateBlackPawnMoves(blackPawnsAll, whitePieces, allPieces, piece) {
   const blackPawnOneStep = (blackPawns >> 8n) & ~allPieces;
   const blackPawnTwoStep = (blackPawnOneStep >> 8n) & maskRank[4] & ~allPieces;
   const blackSteps = blackPawnOneStep | blackPawnTwoStep;
-  const blackPawnLeftAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
-  const blackPawnRightAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
+  const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
+  const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
   const blackMoves = blackSteps | blackPawnLeftAttacks | blackPawnRightAttacks;
 
   return blackMoves;
 }
 
-export { generateBlackPawnMoves, generateWhitePawnMoves, pieceBitboards };
+function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
+  let whiteKingDown = (whiteKing >> 8n) & ~allWhitePieces;
+  let whiteKingUp = (whiteKing << 8n) & ~allWhitePieces;
+  let whiteKingLeft = (whiteKing << 1n) & ~maskFile[7] & ~allWhitePieces;
+  let whiteKingRight = (whiteKing >> 1n) & ~maskFile[0] & ~allWhitePieces;
+  let whiteKingUpLeft = (whiteKing << 9n) & ~maskFile[7] & ~allWhitePieces;
+  let whiteKingUpRight = (whiteKing << 7n) & ~maskFile[0] & ~allWhitePieces;
+  let whiteKingDownLeft = (whiteKing >> 7n) & ~maskFile[7] & ~allWhitePieces;
+  let whiteKingDownRight = (whiteKing >> 9n) & ~maskFile[0] & ~allWhitePieces;
+  let max =
+    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n);
+  whiteKingDown = whiteKingDown > max ? 0b0n : whiteKingDown;
+  whiteKingUp = whiteKingUp > max ? 0b0n : whiteKingUp;
+  whiteKingLeft = whiteKingLeft > max ? 0b0n : whiteKingLeft;
+  whiteKingRight = whiteKingRight > max ? 0b0n : whiteKingRight;
+  whiteKingUpLeft = whiteKingUpLeft > max ? 0b0n : whiteKingUpLeft;
+  whiteKingUpRight = whiteKingUpRight > max ? 0b0n : whiteKingUpRight;
+  whiteKingDownLeft = whiteKingDownLeft > max ? 0b0n : whiteKingDownLeft;
+  whiteKingDownRight = whiteKingDownRight > max ? 0b0n : whiteKingDownRight;
+  const whiteMoves =
+    whiteKingDown |
+    whiteKingUp |
+    whiteKingLeft |
+    whiteKingRight |
+    whiteKingDownLeft |
+    whiteKingDownRight |
+    whiteKingUpLeft |
+    whiteKingUpRight;
+
+  return whiteMoves;
+}
+
+//
+//
+//
+//
+// etc
+// 15 14 13 12 11 10 09 08
+// 07 06 05 04 03 02 01 00
+//
+//
+
+function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
+  let blackKingDown = (blackKing << 8n) & ~allBlackPieces;
+  let blackKingUp = (blackKing >> 8n) & ~allBlackPieces;
+  let blackKingLeft = (blackKing >> 1n) & ~maskFile[0] & ~allBlackPieces;
+  let blackKingRight = (blackKing << 1n) & ~maskFile[7] & ~allBlackPieces;
+  let blackKingUpLeft = (blackKing >> 9n) & ~maskFile[0] & ~allBlackPieces;
+  let blackKingUpRight = (blackKing >> 7n) & ~maskFile[7] & ~allBlackPieces;
+  let blackKingDownLeft = (blackKing << 7n) & ~maskFile[0] & ~allBlackPieces;
+  let blackKingDownRight = (blackKing << 9n) & ~maskFile[7] & ~allBlackPieces;
+  let max =
+    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n);
+  blackKingDown = blackKingDown > max ? 0b0n : blackKingDown;
+  blackKingUp = blackKingUp > max ? 0b0n : blackKingUp;
+  blackKingLeft = blackKingLeft > max ? 0b0n : blackKingLeft;
+  blackKingRight = blackKingRight > max ? 0b0n : blackKingRight;
+  blackKingUpLeft = blackKingUpLeft > max ? 0b0n : blackKingUpLeft;
+  blackKingUpRight = blackKingUpRight > max ? 0b0n : blackKingUpRight;
+  blackKingDownLeft = blackKingDownLeft > max ? 0b0n : blackKingDownLeft;
+  blackKingDownRight = blackKingDownRight > max ? 0b0n : blackKingDownRight;
+  const blackMoves =
+    blackKingDown |
+    blackKingUp |
+    blackKingLeft |
+    blackKingRight |
+    blackKingDownLeft |
+    blackKingDownRight |
+    blackKingUpLeft |
+    blackKingUpRight;
+
+  return blackMoves;
+}
+
+function generateKnightMoves(knights, allPiecesOfColor, piece) {
+  //        3     2
+  //      4          1
+  //
+  //      5          8
+  //        6     7
+  const knight = knights & piece;
+  let knightOne =
+    (knight << 6n) & ~maskFile[1] & ~maskFile[0] & ~allPiecesOfColor;
+  let knightTwo = (knight << 15n) & ~maskFile[0] & ~allPiecesOfColor;
+  let knightThree = (knight << 17n) & ~maskFile[7] & ~allPiecesOfColor;
+  let knightFour =
+    (knight << 10n) & ~maskFile[7] & ~maskFile[6] & ~allPiecesOfColor;
+  let knightFive =
+    (knight >> 6n) & ~maskFile[7] & ~maskFile[6] & ~allPiecesOfColor;
+  let knightSix = (knight >> 15n) & ~maskFile[7] & ~allPiecesOfColor;
+  let knightSeven = (knight >> 17n) & ~maskFile[0] & ~allPiecesOfColor;
+  let knightEight =
+    (knight >> 10n) & ~maskFile[0] & ~maskFile[1] & ~allPiecesOfColor;
+  let max =
+    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n);
+  knightOne = knightOne > max ? 0b0n : knightOne;
+  knightTwo = knightTwo > max ? 0b0n : knightTwo;
+  knightThree = knightThree > max ? 0b0n : knightThree;
+  knightFour = knightFour > max ? 0b0n : knightFour;
+  knightFive = knightFive > max ? 0b0n : knightFive;
+  knightSix = knightSix > max ? 0b0n : knightSix;
+  knightSeven = knightSeven > max ? 0b0n : knightSeven;
+  knightEight = knightEight > max ? 0b0n : knightEight;
+
+  const knightMoves =
+    knightOne |
+    knightTwo |
+    knightThree |
+    knightFour |
+    knightFive |
+    knightSix |
+    knightSeven |
+    knightEight;
+
+  return knightMoves;
+}
+
+export {
+  generateBlackPawnMoves,
+  generateWhitePawnMoves,
+  pieceBitboards,
+  generateBlackKingMovesNoCheckFilter,
+  generateWhiteKingMovesNoCheckFilter,
+  generateKnightMoves,
+};

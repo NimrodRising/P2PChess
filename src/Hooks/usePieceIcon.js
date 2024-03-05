@@ -16,7 +16,7 @@ export const usePieceIcon = (piece) => {
       }
     }
     getIcon();
-  }, []);
+  }, [piece]);
 
   return pieceIcon;
 };

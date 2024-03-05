@@ -15,7 +15,9 @@ function PieceIcon({ piece }) {
   // custom hooks
   const { userPosition, mouseupEvent } = useUserEvents(state.isDraggingPiece);
   const pieceIcon = usePieceIcon(piece);
-
+  useEffect(() => {
+    console.log(pieceIcon);
+  }, [piece, pieceIcon]);
   useEffect(() => {
     dispatch({ type: "RESET" });
   }, [mouseupEvent]);
