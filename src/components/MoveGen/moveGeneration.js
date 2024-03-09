@@ -63,6 +63,7 @@ const pieceBitboards = [
   0b0010000000000000000000000000000000000000000000000000000000000000n,
   0b0100000000000000000000000000000000000000000000000000000000000000n,
   0b1000000000000000000000000000000000000000000000000000000000000000n,
+  0b0000000000000000000000000000000000000000000000000000000000000000n,
 ];
 const maskRank = [
   0b0000000000000000000000000000000000000000000000000000000011111111n,
@@ -84,51 +85,10 @@ const maskFile = [
   0b0000001000000010000000100000001000000010000000100000001000000010n,
   0b0000000100000001000000010000000100000001000000010000000100000001n,
 ];
-let whitePawns =
-  0b0000000000000000000000000000000000000000000000001111111100000000n;
-let whiteRooks =
-  0b0000000000000000000000000000000000000000000000000000000010000001n;
-let whiteKnights =
-  0b0000000000000000000000000000000000000000000000000000000001000010n;
-let whiteBishops =
-  0b0000000000000000000000000000000000000000000000000000000000100100n;
-let whiteQueens =
-  0b0000000000000000000000000000000000000000000000000000000000001000n;
-let whiteKing =
-  0b0000000000000000000000000000000000000000000000000000000000010000n;
-let blackPawns =
-  0b0000000011111111000000000000000000000000000000000000000000000000n;
-let blackRooks =
-  0b1000000100000000000000000000000000000000000000000000000000000000n;
-let blackKnights =
-  0b0100001000000000000000000000000000000000000000000000000000000000n;
-let blackBishops =
-  0b0010010000000000000000000000000000000000000000000000000000000000n;
-let blackQueens =
-  0b0000100000000000000000000000000000000000000000000000000000000000n;
-let blackKing =
-  0b0001000000000000000000000000000000000000000000000000000000000000n;
-
-let allWhitePieces =
-  whitePawns |
-  whiteRooks |
-  whiteKnights |
-  whiteBishops |
-  whiteQueens |
-  whiteKing;
-let allBlackPieces =
-  blackPawns |
-  blackRooks |
-  blackKnights |
-  blackBishops |
-  blackQueens |
-  blackKing;
-let allPieces = allWhitePieces | allBlackPieces;
-allPieces;
 
 function rayNorth(currentSquare, incompleteRay) {
   const nextSquare = currentSquare << 8n;
-  if (nextSquare > BigInt(2 ** 63)) {
+  if (nextSquare > BigInt(2 ** 62 + 2 ** 63) || nextSquare === 0b0n) {
     return incompleteRay;
   } else {
     const ray = incompleteRay | nextSquare;
@@ -138,7 +98,7 @@ function rayNorth(currentSquare, incompleteRay) {
 
 function rayWest(currentSquare, incompleteRay) {
   const nextSquare = (currentSquare << 1n) & ~maskFile[7];
-  if (nextSquare === 0b0n) {
+  if (nextSquare === 0b0n || nextSquare > BigInt(2 ** 63 + 2 ** 62)) {
     return incompleteRay;
   } else {
     const ray = incompleteRay | nextSquare;
@@ -166,15 +126,265 @@ function rayEast(currentSquare, incompleteRay) {
   }
 }
 
-function generateWhitePawnMoves(whitePawnsAll, blackPieces, allPieces, piece) {
+function rayNorthEast(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare << 7n) & ~maskFile[0];
+  if (nextSquare > BigInt(2 ** 63 + 2 ** 62) || nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return rayNorthEast(nextSquare, ray);
+  }
+}
+
+function rayNorthWest(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare << 9n) & ~maskFile[7];
+  if (nextSquare > BigInt(2 ** 63 + 2 ** 62) || nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return rayNorthWest(nextSquare, ray);
+  }
+}
+
+function raySouthEast(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare >> 9n) & ~maskFile[0];
+  if (nextSquare === 0b0n || nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return raySouthEast(nextSquare, ray);
+  }
+}
+
+function raySouthWest(currentSquare, incompleteRay) {
+  const nextSquare = (currentSquare >> 7n) & ~maskFile[7];
+  if (nextSquare === 0b0n) {
+    return incompleteRay;
+  } else {
+    const ray = incompleteRay | nextSquare;
+    return raySouthWest(nextSquare, ray);
+  }
+}
+
+function bitScanForward(bitboard) {
+  let index = 0;
+  while (index <= 63) {
+    if ((pieceBitboards[index] & bitboard) !== 0b0n) {
+      return index;
+    } else {
+      index += 1;
+    }
+  }
+  return 64;
+}
+
+function bitScanReverse(bitboard) {
+  let index = 63;
+  while (index >= 0) {
+    if ((pieceBitboards[index] & bitboard) !== 0b0n) {
+      return index;
+    } else {
+      index -= 1;
+    }
+  }
+  return 64;
+}
+
+function generateQueenMoves(allPieces, allPiecesOfColor, queens, piece) {
+  const queen = queens & piece;
+  const queenBishopMoves = generateBishopMoves(
+    allPieces,
+    allPiecesOfColor,
+    queen,
+    piece,
+  );
+  const queenRookMoves = generateRookMoves(
+    allPieces,
+    allPiecesOfColor,
+    queen,
+    piece,
+  );
+
+  const moves = [
+    ...encodeMoves(piece, queenRookMoves | queenBishopMoves, 0, 0, 0, 0),
+  ];
+
+  return moves;
+}
+
+function generateBishopMoves(allPieces, allPiecesOfColor, bishops, piece) {
+  const bishop = bishops & piece;
+  const northEastEmptyBoard = rayNorthEast(bishop, 0b0n);
+  const northEastBlockingPieces = northEastEmptyBoard & allPieces;
+  const northEastFirstBlockingPiece =
+    pieceBitboards[bitScanForward(northEastBlockingPieces)];
+  const blockingRayNorthEast = rayNorthEast(northEastFirstBlockingPiece, 0b0n);
+  const northEastIncomplete =
+    (northEastEmptyBoard & ~blockingRayNorthEast) | northEastFirstBlockingPiece;
+  const northEast = northEastIncomplete & ~allPiecesOfColor;
+  const northWestEmptyBoard = rayNorthWest(bishop, 0b0n);
+  const northWestBlockingPieces = northWestEmptyBoard & allPieces;
+  const northWestFirstBlockingPiece =
+    pieceBitboards[bitScanForward(northWestBlockingPieces)];
+  const blockingRayNorthWest = rayNorthWest(northWestFirstBlockingPiece, 0b0n);
+  const northWestIncomplete =
+    (northWestEmptyBoard & ~blockingRayNorthWest) | northWestFirstBlockingPiece;
+  const northWest = northWestIncomplete & ~allPiecesOfColor;
+  const southEastEmptyBoard = raySouthEast(bishop, 0b0n);
+  const southEastBlockingPieces = southEastEmptyBoard & allPieces;
+  const southEastFirstBlockingPiece =
+    pieceBitboards[bitScanReverse(southEastBlockingPieces)];
+  const blockingRaySouthEast = raySouthEast(southEastFirstBlockingPiece, 0b0n);
+  const southEastIncomplete =
+    (southEastEmptyBoard & ~blockingRaySouthEast) | southEastFirstBlockingPiece;
+  const southEast = southEastIncomplete & ~allPiecesOfColor;
+  const southWestEmptyBoard = raySouthWest(bishop, 0b0n);
+  const southWestBlockingPieces = southWestEmptyBoard & allPieces;
+  const southWestFirstBlockingPiece =
+    pieceBitboards[bitScanReverse(southWestBlockingPieces)];
+  const blockingRaySouthWest = raySouthWest(southWestBlockingPieces, 0b0n);
+  const southWestIncomplete =
+    (southWestEmptyBoard & ~blockingRaySouthWest) | southWestFirstBlockingPiece;
+  const southWest = southWestIncomplete & ~allPiecesOfColor;
+  const moves = [
+    ...encodeMoves(
+      piece,
+      northEast | northWest | southEast | southWest,
+      0,
+      0,
+      0,
+      0,
+    ),
+  ];
+  return moves;
+}
+
+function generateRookMoves(allPieces, allPiecesOfColor, rooks, piece) {
+  const rook = rooks & piece;
+  const northEmptyBoard = rayNorth(rook, 0b0n);
+  const northBlockingPieces = northEmptyBoard & allPieces;
+  const northFirstBlockingPiece =
+    pieceBitboards[bitScanForward(northBlockingPieces)];
+  const blockingRayNorth = rayNorth(northFirstBlockingPiece, 0b0n);
+  const northIncomplete =
+    (northEmptyBoard & ~blockingRayNorth) | northFirstBlockingPiece;
+  const north = northIncomplete & ~allPiecesOfColor;
+  const eastEmptyBoard = rayEast(rook, 0b0n);
+  const eastBlockingPieces = eastEmptyBoard & allPieces;
+  const eastFirstBlockingPiece =
+    pieceBitboards[bitScanReverse(eastBlockingPieces)];
+  const blockingRayEast = rayEast(eastFirstBlockingPiece, 0b0n);
+  const eastIncomplete =
+    (eastEmptyBoard & ~blockingRayEast) | eastFirstBlockingPiece;
+  const east = eastIncomplete & ~allPiecesOfColor;
+  const southEmptyBoard = raySouth(rook, 0b0n);
+  const southBlockingPieces = southEmptyBoard & allPieces;
+  const southFirstBlockingPiece =
+    pieceBitboards[bitScanReverse(southBlockingPieces)];
+  const blockingRaySouth = raySouth(southFirstBlockingPiece, 0b0n);
+  const southIncomplete =
+    (southEmptyBoard & ~blockingRaySouth) | southFirstBlockingPiece;
+  const south = southIncomplete & ~allPiecesOfColor;
+  const westEmptyBoard = rayWest(rook, 0b0n);
+  const westBlockingPieces = westEmptyBoard & allPieces;
+  const westFirstBlockingPiece =
+    pieceBitboards[bitScanForward(westBlockingPieces)];
+  const blockingRayWest = rayWest(westFirstBlockingPiece, 0b0n);
+  const westIncomplete =
+    (westEmptyBoard & ~blockingRayWest) | westFirstBlockingPiece;
+  const west = westIncomplete & ~allPiecesOfColor;
+
+  const rookMoves = north | east | south | west;
+  const moves = [...encodeMoves(piece, rookMoves, 0, 0, 0, 0)];
+  return moves;
+}
+
+function getEnPassantPieces(prevBB, currBB) {
+  const prevRank = prevBB & (maskRank[3] | maskRank[4]);
+  const currRank = currBB & (maskRank[3] | maskRank[4]);
+  const difference = prevRank & ~currRank;
+  console.log(difference.toString(2));
+  return difference;
+}
+
+function encodeMoves(
+  piece,
+  bitboard,
+  promotion,
+  doublePush,
+  castling,
+  enpassant,
+) {
+  // from, to, flags
+  let move = 0b0n;
+  let moves;
+  const promotionFlag = 0b0000000000001000n;
+  const doublePushFlag = 0b0000000000000100n;
+  const castlingFlag = 0b0000000000000010n;
+  const enpassantFlag = 0b0000000000000001n;
+  if (promotion) move = move | promotionFlag;
+  if (doublePush) move = move | doublePushFlag;
+  if (castling) move = move | castlingFlag;
+  if (enpassant) move = move | enpassantFlag;
+  // get index of piece
+  let indexOfFrom = 0;
+  while (pieceBitboards[index] & (piece === 0)) {
+    indexOfFrom += 1;
+  }
+  move = move | (BigInt(indexOfFrom) << 4);
+  let currentMove;
+  let indexOfTo = 0;
+  // go through each valid move and encode it with the 'common move'
+  for (const pieceBitboard in pieceBitboards) {
+    if (pieceBitboard & (bitboard > 0b0n)) {
+      currentMove = move | (BigInt(indexOfTo) << 8);
+      moves.push(currentMove);
+    }
+    indexOfTo += 1;
+  }
+
+  return moves;
+}
+
+function generateWhitePawnMovesDef(
+  whitePawnsAll,
+  blackPieces,
+  allPieces,
+  piece,
+  blackPawns,
+  enPassantPieces,
+) {
   const whitePawns = whitePawnsAll & piece;
   const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
   const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
   const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
   const whitePawnLeftAttacks = (whitePawns << 9n) & ~maskFile[7] & blackPieces;
   const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[0] & blackPieces;
-  const whiteMoves = whiteSteps | whitePawnLeftAttacks | whitePawnRightAttacks;
 
+  const enPassantLeftPiece =
+    ((blackPawns & enPassantPieces) >> 1n) &
+    whitePawns &
+    maskRank[4] &
+    whitePawns;
+  const enPassantRightPiece =
+    ((blackPawns & enPassantPieces) << 1n) &
+    whitePawns &
+    maskRank[4] &
+    whitePawns;
+  let enPassantLeft = 0b0n;
+  let enPassantRight = 0b0n;
+  if (enPassantLeftPiece !== 0b0n) {
+    enPassantLeft = enPassantLeftPiece << 9n;
+  }
+  if (enPassantRightPiece !== 0b0n) {
+    enPassantRight = enPassantRightPiece << 7n;
+  }
+  const whiteMoves =
+    whiteSteps |
+    whitePawnLeftAttacks |
+    whitePawnRightAttacks |
+    enPassantLeft |
+    enPassantRight;
   if (
     whiteMoves >
     BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n)
@@ -184,16 +394,160 @@ function generateWhitePawnMoves(whitePawnsAll, blackPieces, allPieces, piece) {
   return whiteMoves;
 }
 
-function generateBlackPawnMoves(blackPawnsAll, whitePieces, allPieces, piece) {
+function generateWhitePawnMoves(
+  whitePawnsAll,
+  blackPieces,
+  allPieces,
+  piece,
+  blackPawns,
+  enPassantPieces,
+) {
+  const whitePawns = whitePawnsAll & piece;
+  const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
+  const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
+  const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
+  const whitePawnLeftAttacks = (whitePawns << 9n) & ~maskFile[7] & blackPieces;
+  const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[0] & blackPieces;
+  const enPassantLeftPiece =
+    ((blackPawns & enPassantPieces) >> 1n) &
+    whitePawns &
+    maskRank[4] &
+    whitePawns;
+  const enPassantRightPiece =
+    ((blackPawns & enPassantPieces) << 1n) &
+    whitePawns &
+    maskRank[4] &
+    whitePawns;
+  let enPassantLeft = 0b0n;
+  let enPassantRight = 0b0n;
+  if (enPassantLeftPiece !== 0b0n) {
+    enPassantLeft = enPassantLeftPiece << 9n;
+  }
+  if (enPassantRightPiece !== 0b0n) {
+    enPassantRight = enPassantRightPiece << 7n;
+  }
+
+  const whiteMoves =
+    whiteSteps |
+    whitePawnLeftAttacks |
+    whitePawnRightAttacks |
+    enPassantLeft |
+    enPassantRight;
+  if (
+    whiteMoves >
+    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n)
+  ) {
+    return [];
+  }
+
+  const moves = [
+    ...encodeMoves(piece, whitePawnOneStep, 0, 0, 0, 0),
+    ...encodeMoves(piece, whitePawnTwoStep, 0, 1, 0, 0),
+    ...encodeMoves(
+      piece,
+      whitePawnLeftAttacks | whitePawnRightAttacks,
+      0,
+      0,
+      0,
+      0,
+    ),
+    ...encodeMoves(piece, enPassantRight | enPassantLeft, 0, 0, 0, 1),
+  ];
+
+  return moves;
+}
+
+function generateBlackPawnMovesDef(
+  blackPawnsAll,
+  whitePieces,
+  allPieces,
+  piece,
+  whitePawns,
+  enPassantPieces,
+) {
   const blackPawns = blackPawnsAll & piece;
   const blackPawnOneStep = (blackPawns >> 8n) & ~allPieces;
   const blackPawnTwoStep = (blackPawnOneStep >> 8n) & maskRank[4] & ~allPieces;
   const blackSteps = blackPawnOneStep | blackPawnTwoStep;
   const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
   const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
-  const blackMoves = blackSteps | blackPawnLeftAttacks | blackPawnRightAttacks;
+  const enPassantLeftPiece =
+    ((whitePawns & enPassantPieces) << 1n) &
+    whitePawns &
+    maskRank[3] &
+    blackPawns;
+  const enPassantRightPiece =
+    ((whitePawns & enPassantPieces) >> 1n) &
+    blackPawns &
+    maskRank[3] &
+    blackPawns;
+  let enPassantLeft = 0b0n;
+  let enPassantRight = 0b0n;
+  if (enPassantLeftPiece !== 0b0n) {
+    enPassantLeft = enPassantLeftPiece >> 9n;
+  }
+  if (enPassantRightPiece !== 0b0n) {
+    enPassantRight = enPassantRightPiece >> 7n;
+  }
+  const blackMoves =
+    blackSteps |
+    blackPawnLeftAttacks |
+    blackPawnRightAttacks |
+    enPassantLeft |
+    enPassantRight;
 
   return blackMoves;
+}
+
+function generateBlackPawnMoves(
+  blackPawnsAll,
+  whitePieces,
+  allPieces,
+  piece,
+  whitePawns,
+  enPassantPieces,
+) {
+  const blackPawns = blackPawnsAll & piece;
+  const blackPawnOneStep = (blackPawns >> 8n) & ~allPieces;
+  const blackPawnTwoStep = (blackPawnOneStep >> 8n) & maskRank[4] & ~allPieces;
+  const blackSteps = blackPawnOneStep | blackPawnTwoStep;
+  const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
+  const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
+  const enPassantLeftPiece =
+    ((whitePawns & enPassantPieces) << 1n) &
+    whitePawns &
+    maskRank[3] &
+    blackPawns;
+  const enPassantRightPiece =
+    ((whitePawns & enPassantPieces) >> 1n) &
+    blackPawns &
+    maskRank[3] &
+    blackPawns;
+  let enPassantLeft = 0b0n;
+  let enPassantRight = 0b0n;
+  if (enPassantLeftPiece !== 0b0n) {
+    enPassantLeft = enPassantLeftPiece >> 9n;
+  }
+  if (enPassantRightPiece !== 0b0n) {
+    enPassantRight = enPassantRightPiece >> 7n;
+  }
+
+  let moves = [
+    // flags: promotion, double push, castling, en passant
+    ...encodeMoves(piece, blackPawnOneStep, 0, 0, 0, 1),
+    ...encodeMoves(piece, blackPawnTwoStep, 0, 1, 0, 0),
+    ...encodeMoves(
+      piece,
+      blackPawnLeftAttacks | blackPawnRightAttacks,
+      0,
+      0,
+      0,
+      0,
+    ),
+    ...encodeMoves(piece, enPassantLeft | enPassantRight, 0, 0, 0, 1),
+  ];
+
+  return moves;
 }
 
 function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
@@ -224,19 +578,9 @@ function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
     whiteKingDownRight |
     whiteKingUpLeft |
     whiteKingUpRight;
-
-  return whiteMoves;
+  const moves = [...encodeMoves(piece, whiteMoves, 0, 0, 0, 0)];
+  return moves;
 }
-
-//
-//
-//
-//
-// etc
-// 15 14 13 12 11 10 09 08
-// 07 06 05 04 03 02 01 00
-//
-//
 
 function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
   let blackKingDown = (blackKing << 8n) & ~allBlackPieces;
@@ -266,8 +610,8 @@ function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
     blackKingDownRight |
     blackKingUpLeft |
     blackKingUpRight;
-
-  return blackMoves;
+  const moves = [...encodeMoves(piece, blackMoves, 0, 0, 0, 0)];
+  return moves;
 }
 
 function generateKnightMoves(knights, allPiecesOfColor, piece) {
@@ -309,8 +653,8 @@ function generateKnightMoves(knights, allPiecesOfColor, piece) {
     knightSix |
     knightSeven |
     knightEight;
-
-  return knightMoves;
+  const moves = [...encodeMoves(piece, knightMoves, 0, 0, 0, 0)];
+  return moves;
 }
 
 export {
@@ -320,4 +664,8 @@ export {
   generateBlackKingMovesNoCheckFilter,
   generateWhiteKingMovesNoCheckFilter,
   generateKnightMoves,
+  generateRookMoves,
+  generateBishopMoves,
+  generateQueenMoves,
+  getEnPassantPieces,
 };

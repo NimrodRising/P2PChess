@@ -17,8 +17,8 @@ function Square({ square, handleGrab, handleDrop, isLegal }) {
       }}
       onMouseDown={() => handleGrab(square.index, square.piece)}
       className={`aspect-square w-full flex items-center justify-center m-0 p-0 ${
-        (square.file + square.rank) % 2 !== 0 ? "bg-blue-400" : "bg-white"
-      } ${isLegal ? "bg-red-200" : ""}`}
+        (square.file + square.rank) % 2 !== 0 && !isLegal ? "bg-blue-400" : ""
+      } ${isLegal ? "bg-red-100" : ""}`}
     >
       {" "}
       <PieceIcon

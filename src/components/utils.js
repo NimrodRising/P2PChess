@@ -32,6 +32,26 @@ function toBitboard(regex, board) {
   return binaryStringToBigInt(binaryString);
 }
 
+// takes bitboard object - containing bitboards for each piece type - and converts it to array consumable by component
+function bitboardToArray(boardState) {
+  const board = new Array(64);
+  for (const pieceType in boardState) {
+    const binaryStringIncomplete = boardState[pieceType].toString(2);
+    const padding = "0".repeat(64 - binaryStringIncomplete.length);
+    const binaryString = padding + binaryStringIncomplete;
+    const binaryStringArray = binaryString.split("");
+    binaryStringArray.forEach((el, index) => {
+      if (el === "1") {
+        board[index] = pieceType;
+      } else if (!board[index]) {
+        board[index] = "";
+      }
+    });
+  }
+  console.log(board);
+  return board;
+}
+
 function bitboardToList(bitboard) {
   const binaryString = bitboard.toString(2);
   let padding;
@@ -57,4 +77,5 @@ export {
   binaryStringToBigInt,
   toBitboard,
   bitboardToList,
+  bitboardToArray,
 };
