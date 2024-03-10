@@ -48,8 +48,17 @@ function bitboardToArray(boardState) {
       }
     });
   }
-  console.log(board);
   return board;
+}
+
+// takes moves array and returns array of the "to squares" there-encoded
+function getSquaresFromMoves(moves) {
+  // moves are in format: from (6 bits) to (6 bits) flags (4 bits)
+  const mask = 0b111111n;
+  const squares = moves.map((move) => {
+    return 63 - parseInt(((mask << 4n) & move) >> 4n);
+  });
+  return squares;
 }
 
 function bitboardToList(bitboard) {
@@ -78,4 +87,5 @@ export {
   toBitboard,
   bitboardToList,
   bitboardToArray,
+  getSquaresFromMoves,
 };

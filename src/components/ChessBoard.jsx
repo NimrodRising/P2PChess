@@ -20,9 +20,10 @@ import {
   arraysEqual,
   binaryStringToBigInt,
   toBitboard,
-  bitboardToList,
   bitboardToArray,
+  getSquaresFromMoves,
 } from "./utils.js";
+import { makeMove } from "./MoveGen/makeMove.js";
 doesContainSubArray;
 arraysEqual;
 binaryStringToBigInt;
@@ -56,16 +57,17 @@ const initialBoardAction = {
 
 function ChessBoard() {
   const [board, setBoard] = useState(initialBoard);
+  const [bitboard, setBitboard] = useState(initialBitboard);
   const [state, dispatch] = useReducer(reducer, initialBoardAction);
   const [legalMoves, setLegalMoves] = useState([]);
+  const [legalSquares, setLegalSquares] = useState([]);
+
   useEffect(() => {
-    function makeMove(state) {
-      let boardCopy = [...board];
-      boardCopy[state.from] = "";
-      boardCopy[state.to] = state.piece;
-      dispatch({ type: "UPDATE_ENPASSANT_PIECES", board: board });
-      return boardCopy;
-    }
+    console.log("working");
+    setBoard(bitboardToArray(bitboard));
+  }, [bitboard]);
+
+  useEffect(() => {
     if (state.isPondering) {
       const legalMoves = generateLegalMoves(
         state.piece,
@@ -73,12 +75,21 @@ function ChessBoard() {
         board,
         state.enPassantPieces,
       );
-      setLegalMoves(legalMoves); // setting legal moves to highlight legal squares
+      setLegalMoves(legalMoves);
+      setLegalSquares(getSquaresFromMoves(legalMoves));
     }
     if (!state.isPondering && state.to !== null) {
-      setBoard(makeMove(state));
+      const move = legalMoves[legalSquares.indexOf(state.to)];
+      const newBitboard = makeMove(bitboard, state.piece, move);
+      const newBoard = bitboardToArray(newBitboard);
+      setBitboard(newBitboard);
+      setBoard(newBoard);
       dispatch({ type: "RESET" });
+      setLegalSquares([]);
+    } else if (!state.isPondering) {
+      setLegalSquares([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, board]);
 
   function handleGrab(index, piece) {
@@ -88,9 +99,8 @@ function ChessBoard() {
   function handleDrop(index) {
     dispatch({
       type: "DROP_PIECE",
-      to: legalMoves.includes(index) ? index : null,
+      to: legalSquares.includes(index) ? index : null,
     });
-    setLegalMoves([]);
   }
 
   return (
@@ -98,7 +108,7 @@ function ChessBoard() {
       <div className=" grid grid-cols-8">
         {board.map((piece, index) => (
           <Square
-            isLegal={legalMoves.includes(index)}
+            isLegal={legalSquares.includes(index)}
             handleDrop={handleDrop}
             handleGrab={handleGrab}
             key={index}
@@ -166,7 +176,7 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
   const blackPawns = toBitboard(/bP/, board);
   switch (piece) {
     case "wP": {
-      const legalMovesBB = generateWhitePawnMoves(
+      const legalMoves = generateWhitePawnMoves(
         whitePawns,
         blackPieces,
         allPieces,
@@ -174,10 +184,10 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
         blackPawns,
         enPassantPieces,
       );
-      return bitboardToList(legalMovesBB); // converts the bitboard of legal squares to list of legal squares (indeces)
+      return legalMoves;
     }
     case "bP": {
-      const legalMovesBB = generateBlackPawnMoves(
+      const legalMoves = generateBlackPawnMoves(
         blackPawns,
         whitePieces,
         allPieces,
@@ -185,111 +195,110 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
         whitePawns,
         enPassantPieces,
       );
-      return bitboardToList(legalMovesBB); // converts the bitboard of legal squares to list of legal squares (indeces)
+      return legalMoves;
     }
     case "bK": {
       const blackKing = toBitboard(/bK/, board);
-      const legalMovesBB = generateBlackKingMovesNoCheckFilter(
+      const legalMoves = generateBlackKingMovesNoCheckFilter(
         blackKing,
         blackPieces,
       );
 
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
     case "wK": {
       const whiteKing = toBitboard(/wK/, board);
-      const legalMovesBB = generateWhiteKingMovesNoCheckFilter(
+      const legalMoves = generateWhiteKingMovesNoCheckFilter(
         whiteKing,
         whitePieces,
       );
 
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
     case "wN": {
       const whiteKnights = toBitboard(/wN/, board);
-      const legalMovesBB = generateKnightMoves(
+      const legalMoves = generateKnightMoves(
         whiteKnights,
         whitePieces,
         pieceBB,
       );
-
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
     case "bN": {
       const blackKnights = toBitboard(/bN/, board);
-      const legalMovesBB = generateKnightMoves(
+      const legalMoves = generateKnightMoves(
         blackKnights,
         blackPieces,
         pieceBB,
       );
 
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
     case "wR": {
       const rooks = toBitboard(/wR/, board);
-      const legalMovesBB = generateRookMoves(
+      const legalMoves = generateRookMoves(
         allPieces,
         whitePieces,
         rooks,
         pieceBB,
       );
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
 
     case "bR": {
       const rooks = toBitboard(/bR/, board);
-      const legalMovesBB = generateRookMoves(
+      const legalMoves = generateRookMoves(
         allPieces,
         blackPieces,
         rooks,
         pieceBB,
       );
 
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
 
     case "wB": {
       const bishops = toBitboard(/wB/, board);
-      const legalMovesBB = generateBishopMoves(
+      const legalMoves = generateBishopMoves(
         allPieces,
         whitePieces,
         bishops,
         pieceBB,
       );
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
 
     case "bB": {
       const bishops = toBitboard(/bB/, board);
-      const legalMovesBB = generateBishopMoves(
+      const legalMoves = generateBishopMoves(
         allPieces,
         blackPieces,
         bishops,
         pieceBB,
       );
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
 
     case "wQ": {
       const queens = toBitboard(/wQ/, board);
-      const legalMovesBB = generateQueenMoves(
+      const legalMoves = generateQueenMoves(
         allPieces,
         whitePieces,
         queens,
         pieceBB,
       );
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
 
     case "bQ": {
       const queens = toBitboard(/bQ/, board);
-      const legalMovesBB = generateQueenMoves(
+      const legalMoves = generateQueenMoves(
         allPieces,
         blackPieces,
         queens,
         pieceBB,
       );
-      return bitboardToList(legalMovesBB);
+      return legalMoves;
     }
     default: {
       console.log("I haven't programmed legal moves for this piece type yet!");

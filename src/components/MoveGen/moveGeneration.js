@@ -204,10 +204,7 @@ function generateQueenMoves(allPieces, allPiecesOfColor, queens, piece) {
     queen,
     piece,
   );
-
-  const moves = [
-    ...encodeMoves(piece, queenRookMoves | queenBishopMoves, 0, 0, 0, 0),
-  ];
+  const moves = queenRookMoves.concat(queenBishopMoves);
 
   return moves;
 }
@@ -303,7 +300,6 @@ function getEnPassantPieces(prevBB, currBB) {
   const prevRank = prevBB & (maskRank[3] | maskRank[4]);
   const currRank = currBB & (maskRank[3] | maskRank[4]);
   const difference = prevRank & ~currRank;
-  console.log(difference.toString(2));
   return difference;
 }
 
@@ -317,7 +313,7 @@ function encodeMoves(
 ) {
   // from, to, flags
   let move = 0b0n;
-  let moves;
+  let moves = [];
   const promotionFlag = 0b0000000000001000n;
   const doublePushFlag = 0b0000000000000100n;
   const castlingFlag = 0b0000000000000010n;
@@ -328,21 +324,20 @@ function encodeMoves(
   if (enpassant) move = move | enpassantFlag;
   // get index of piece
   let indexOfFrom = 0;
-  while (pieceBitboards[index] & (piece === 0)) {
+  while ((pieceBitboards[indexOfFrom] & piece) === 0) {
     indexOfFrom += 1;
   }
-  move = move | (BigInt(indexOfFrom) << 4);
+  move = move | (BigInt(indexOfFrom) << 10n);
   let currentMove;
   let indexOfTo = 0;
   // go through each valid move and encode it with the 'common move'
-  for (const pieceBitboard in pieceBitboards) {
-    if (pieceBitboard & (bitboard > 0b0n)) {
-      currentMove = move | (BigInt(indexOfTo) << 8);
+  for (const pieceBitboard of pieceBitboards) {
+    if ((pieceBitboard & bitboard) > 0b0n) {
+      currentMove = move | (BigInt(indexOfTo) << 4n);
       moves.push(currentMove);
     }
     indexOfTo += 1;
   }
-
   return moves;
 }
 
@@ -578,7 +573,7 @@ function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
     whiteKingDownRight |
     whiteKingUpLeft |
     whiteKingUpRight;
-  const moves = [...encodeMoves(piece, whiteMoves, 0, 0, 0, 0)];
+  const moves = [...encodeMoves(whiteKing, whiteMoves, 0, 0, 0, 0)];
   return moves;
 }
 
@@ -610,7 +605,7 @@ function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
     blackKingDownRight |
     blackKingUpLeft |
     blackKingUpRight;
-  const moves = [...encodeMoves(piece, blackMoves, 0, 0, 0, 0)];
+  const moves = [...encodeMoves(blackKing, blackMoves, 0, 0, 0, 0)];
   return moves;
 }
 

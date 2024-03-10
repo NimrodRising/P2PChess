@@ -2,9 +2,6 @@ import { useState } from "react";
 import PieceIcon from "./PieceIcon";
 
 function Square({ square, handleGrab, handleDrop, isLegal }) {
-  if (square.index === 36) {
-    console.log(square.piece);
-  }
   const [isHovered, setIsHovered] = useState(false);
 
   return (
