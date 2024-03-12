@@ -10,7 +10,6 @@ import {
   generateRookMoves,
   generateBishopMoves,
   generateQueenMoves,
-  getEnPassantPieces,
 } from "./MoveGen/moveGeneration";
 generateBlackPawnMoves;
 generateWhitePawnMoves;
@@ -50,22 +49,21 @@ const initialBoardAction = {
   to: null,
   from: null,
   piece: null,
-  enPassantPieces:
-    0b0000000000000000000000001111111111111111000000000000000000000000n,
-  canCastle: true,
+};
+
+const initialMetadata = {
+  canCastle: { short: true, long: true },
+  canCastleLong: true,
+  enPassantPiece: 0b0n,
 };
 
 function ChessBoard() {
   const [board, setBoard] = useState(initialBoard);
   const [bitboard, setBitboard] = useState(initialBitboard);
+  const [metadata, setMetadata] = useState(initialMetadata);
   const [state, dispatch] = useReducer(reducer, initialBoardAction);
   const [legalMoves, setLegalMoves] = useState([]);
   const [legalSquares, setLegalSquares] = useState([]);
-
-  useEffect(() => {
-    console.log("working");
-    setBoard(bitboardToArray(bitboard));
-  }, [bitboard]);
 
   useEffect(() => {
     if (state.isPondering) {
@@ -73,17 +71,23 @@ function ChessBoard() {
         state.piece,
         state.from,
         board,
-        state.enPassantPieces,
+        metadata,
       );
       setLegalMoves(legalMoves);
       setLegalSquares(getSquaresFromMoves(legalMoves));
     }
     if (!state.isPondering && state.to !== null) {
       const move = legalMoves[legalSquares.indexOf(state.to)];
-      const newBitboard = makeMove(bitboard, state.piece, move);
+      const { newBitboard, newMetadata } = makeMove(
+        bitboard,
+        state.piece,
+        move,
+        metadata,
+      );
       const newBoard = bitboardToArray(newBitboard);
       setBitboard(newBitboard);
       setBoard(newBoard);
+      setMetadata(newMetadata);
       dispatch({ type: "RESET" });
       setLegalSquares([]);
     } else if (!state.isPondering) {
@@ -146,17 +150,6 @@ function reducer(state, action) {
     case "RESET": {
       return {
         ...initialBoardAction,
-        enPassantPieces: state.enPassantPieces,
-      };
-    }
-    case "UPDATE_ENPASSANT_PIECES": {
-      const enPassantPieces = getEnPassantPieces(
-        state.enPassantPieces,
-        toBitboard(/P/, action.board),
-      );
-      return {
-        ...state,
-        enPassantPieces: enPassantPieces,
       };
     }
     default: {
@@ -165,7 +158,7 @@ function reducer(state, action) {
   }
 }
 
-function generateLegalMoves(piece, index, board, enPassantPieces) {
+function generateLegalMoves(piece, index, board, metadata) {
   let legalMoves = [];
   // the regex in allPieces matches all non space characters
   const allPieces = toBitboard(/^(?!\s*$).+/, board);
@@ -174,6 +167,8 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
   const whitePawns = toBitboard(/wP/, board);
   const blackPieces = toBitboard(/b/, board);
   const blackPawns = toBitboard(/bP/, board);
+  const enPassantPiece = metadata["enPassantPiece"];
+  const canCastle = metadata["canCastle"];
   switch (piece) {
     case "wP": {
       const legalMoves = generateWhitePawnMoves(
@@ -182,7 +177,7 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
         allPieces,
         pieceBB,
         blackPawns,
-        enPassantPieces,
+        enPassantPiece,
       );
       return legalMoves;
     }
@@ -193,7 +188,7 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
         allPieces,
         pieceBB,
         whitePawns,
-        enPassantPieces,
+        enPassantPiece,
       );
       return legalMoves;
     }
@@ -202,6 +197,7 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
       const legalMoves = generateBlackKingMovesNoCheckFilter(
         blackKing,
         blackPieces,
+        canCastle,
       );
 
       return legalMoves;
@@ -211,6 +207,7 @@ function generateLegalMoves(piece, index, board, enPassantPieces) {
       const legalMoves = generateWhiteKingMovesNoCheckFilter(
         whiteKing,
         whitePieces,
+        canCastle,
       );
 
       return legalMoves;

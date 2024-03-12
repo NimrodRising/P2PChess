@@ -296,13 +296,6 @@ function generateRookMoves(allPieces, allPiecesOfColor, rooks, piece) {
   return moves;
 }
 
-function getEnPassantPieces(prevBB, currBB) {
-  const prevRank = prevBB & (maskRank[3] | maskRank[4]);
-  const currRank = currBB & (maskRank[3] | maskRank[4]);
-  const difference = prevRank & ~currRank;
-  return difference;
-}
-
 function encodeMoves(
   piece,
   bitboard,
@@ -324,15 +317,16 @@ function encodeMoves(
   if (enpassant) move = move | enpassantFlag;
   // get index of piece
   let indexOfFrom = 0;
-  while ((pieceBitboards[indexOfFrom] & piece) === 0) {
+  while ((pieceBitboards[indexOfFrom] & piece) === 0n) {
     indexOfFrom += 1;
   }
+
   move = move | (BigInt(indexOfFrom) << 10n);
   let currentMove;
   let indexOfTo = 0;
-  // go through each valid move and encode it with the 'common move'
+  // go through each valid move and ancode it with the 'common move'
   for (const pieceBitboard of pieceBitboards) {
-    if ((pieceBitboard & bitboard) > 0b0n) {
+    if ((pieceBitboard & bitboard) !== 0b0n) {
       currentMove = move | (BigInt(indexOfTo) << 4n);
       moves.push(currentMove);
     }
@@ -357,15 +351,9 @@ function generateWhitePawnMovesDef(
   const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[0] & blackPieces;
 
   const enPassantLeftPiece =
-    ((blackPawns & enPassantPieces) >> 1n) &
-    whitePawns &
-    maskRank[4] &
-    whitePawns;
+    ((blackPawns & enPassantPieces) >> 1n) & maskRank[4] & whitePawns;
   const enPassantRightPiece =
-    ((blackPawns & enPassantPieces) << 1n) &
-    whitePawns &
-    maskRank[4] &
-    whitePawns;
+    ((blackPawns & enPassantPieces) << 1n) & maskRank[4] & whitePawns;
   let enPassantLeft = 0b0n;
   let enPassantRight = 0b0n;
   if (enPassantLeftPiece !== 0b0n) {
@@ -467,15 +455,9 @@ function generateBlackPawnMovesDef(
   const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
   const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
   const enPassantLeftPiece =
-    ((whitePawns & enPassantPieces) << 1n) &
-    whitePawns &
-    maskRank[3] &
-    blackPawns;
+    ((whitePawns & enPassantPieces) << 1n) & maskRank[3] & blackPawns;
   const enPassantRightPiece =
-    ((whitePawns & enPassantPieces) >> 1n) &
-    blackPawns &
-    maskRank[3] &
-    blackPawns;
+    ((whitePawns & enPassantPieces) >> 1n) & maskRank[3] & blackPawns;
   let enPassantLeft = 0b0n;
   let enPassantRight = 0b0n;
   if (enPassantLeftPiece !== 0b0n) {
@@ -509,15 +491,9 @@ function generateBlackPawnMoves(
   const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
   const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
   const enPassantLeftPiece =
-    ((whitePawns & enPassantPieces) << 1n) &
-    whitePawns &
-    maskRank[3] &
-    blackPawns;
+    ((whitePawns & enPassantPieces) << 1n) & maskRank[3] & blackPawns;
   const enPassantRightPiece =
-    ((whitePawns & enPassantPieces) >> 1n) &
-    blackPawns &
-    maskRank[3] &
-    blackPawns;
+    ((whitePawns & enPassantPieces) >> 1n) & maskRank[3] & blackPawns;
   let enPassantLeft = 0b0n;
   let enPassantRight = 0b0n;
   if (enPassantLeftPiece !== 0b0n) {
@@ -529,7 +505,7 @@ function generateBlackPawnMoves(
 
   let moves = [
     // flags: promotion, double push, castling, en passant
-    ...encodeMoves(piece, blackPawnOneStep, 0, 0, 0, 1),
+    ...encodeMoves(piece, blackPawnOneStep, 0, 0, 0, 0),
     ...encodeMoves(piece, blackPawnTwoStep, 0, 1, 0, 0),
     ...encodeMoves(
       piece,
@@ -545,7 +521,11 @@ function generateBlackPawnMoves(
   return moves;
 }
 
-function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
+function generateWhiteKingMovesNoCheckFilter(
+  whiteKing,
+  allWhitePieces,
+  canCastle = true,
+) {
   let whiteKingDown = (whiteKing >> 8n) & ~allWhitePieces;
   let whiteKingUp = (whiteKing << 8n) & ~allWhitePieces;
   let whiteKingLeft = (whiteKing << 1n) & ~maskFile[7] & ~allWhitePieces;
@@ -573,11 +553,27 @@ function generateWhiteKingMovesNoCheckFilter(whiteKing, allWhitePieces) {
     whiteKingDownRight |
     whiteKingUpLeft |
     whiteKingUpRight;
-  const moves = [...encodeMoves(whiteKing, whiteMoves, 0, 0, 0, 0)];
+
+  let castleMoves = 0b0n;
+  if (canCastle.short) {
+    castleMoves = castleMoves | (whiteKing >> 2n);
+  }
+  if (canCastle.long) {
+    castleMoves = castleMoves | (whiteKing << 2n);
+  }
+
+  const moves = [
+    ...encodeMoves(whiteKing, whiteMoves, 0, 0, 0, 0),
+    ...encodeMoves(whiteKing, castleMoves, 0, 0, 1, 0),
+  ];
   return moves;
 }
 
-function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
+function generateBlackKingMovesNoCheckFilter(
+  blackKing,
+  allBlackPieces,
+  canCastle = true,
+) {
   let blackKingDown = (blackKing << 8n) & ~allBlackPieces;
   let blackKingUp = (blackKing >> 8n) & ~allBlackPieces;
   let blackKingLeft = (blackKing >> 1n) & ~maskFile[0] & ~allBlackPieces;
@@ -605,7 +601,17 @@ function generateBlackKingMovesNoCheckFilter(blackKing, allBlackPieces) {
     blackKingDownRight |
     blackKingUpLeft |
     blackKingUpRight;
-  const moves = [...encodeMoves(blackKing, blackMoves, 0, 0, 0, 0)];
+  let castleMoves = 0b0n;
+  if (canCastle.short) {
+    castleMoves = castleMoves | (blackKing >> 2n);
+  }
+  if (canCastle.long) {
+    castleMoves = castleMoves | (blackKing << 2n);
+  }
+  const moves = [
+    ...encodeMoves(blackKing, blackMoves, 0, 0, 0, 0),
+    ...encodeMoves(blackKing, castleMoves, 0, 0, 1, 0),
+  ];
   return moves;
 }
 
@@ -662,5 +668,4 @@ export {
   generateRookMoves,
   generateBishopMoves,
   generateQueenMoves,
-  getEnPassantPieces,
 };
