@@ -1,3 +1,20 @@
+import { makeMove } from "./makeMove.js";
+
+const emptyBitboard = {
+  wP: 0b0n,
+  wB: 0b0n,
+  wN: 0b0n,
+  wR: 0b0n,
+  wQ: 0b0n,
+  wK: 0b0n,
+  bP: 0b0n,
+  bB: 0b0n,
+  bN: 0b0n,
+  bR: 0b0n,
+  bQ: 0b0n,
+  bK: 0b0n,
+};
+
 const pieceBitboards = [
   0b0000000000000000000000000000000000000000000000000000000000000001n,
   0b0000000000000000000000000000000000000000000000000000000000000010n,
@@ -190,27 +207,43 @@ function bitScanReverse(bitboard) {
   return 64;
 }
 
-function generateQueenMoves(allPieces, allPiecesOfColor, queens, piece) {
-  const queen = queens & piece;
+function generateQueenMoves(
+  allPieces,
+  allPiecesOfColor,
+  queens,
+  piece,
+  query = "",
+) {
+  const queen = query === "squares" ? piece : queens & piece;
   const queenBishopMoves = generateBishopMoves(
     allPieces,
     allPiecesOfColor,
     queen,
     piece,
+    query,
   );
   const queenRookMoves = generateRookMoves(
     allPieces,
     allPiecesOfColor,
     queen,
     piece,
+    query,
   );
+  if (query === "squares") return queenBishopMoves | queenRookMoves;
+
   const moves = queenRookMoves.concat(queenBishopMoves);
 
   return moves;
 }
 
-function generateBishopMoves(allPieces, allPiecesOfColor, bishops, piece) {
-  const bishop = bishops & piece;
+function generateBishopMoves(
+  allPieces,
+  allPiecesOfColor,
+  bishops,
+  piece,
+  query = "",
+) {
+  const bishop = query === "squares" ? piece : bishops & piece;
   const northEastEmptyBoard = rayNorthEast(bishop, 0b0n);
   const northEastBlockingPieces = northEastEmptyBoard & allPieces;
   const northEastFirstBlockingPiece =
@@ -243,6 +276,11 @@ function generateBishopMoves(allPieces, allPiecesOfColor, bishops, piece) {
   const southWestIncomplete =
     (southWestEmptyBoard & ~blockingRaySouthWest) | southWestFirstBlockingPiece;
   const southWest = southWestIncomplete & ~allPiecesOfColor;
+
+  if (query === "squares") {
+    return northEast | northWest | southEast | southWest;
+  }
+
   const moves = [
     ...encodeMoves(
       piece,
@@ -256,8 +294,14 @@ function generateBishopMoves(allPieces, allPiecesOfColor, bishops, piece) {
   return moves;
 }
 
-function generateRookMoves(allPieces, allPiecesOfColor, rooks, piece) {
-  const rook = rooks & piece;
+function generateRookMoves(
+  allPieces,
+  allPiecesOfColor,
+  rooks,
+  piece,
+  query = "",
+) {
+  const rook = query === "squares" ? piece : rooks & piece;
   const northEmptyBoard = rayNorth(rook, 0b0n);
   const northBlockingPieces = northEmptyBoard & allPieces;
   const northFirstBlockingPiece =
@@ -292,6 +336,9 @@ function generateRookMoves(allPieces, allPiecesOfColor, rooks, piece) {
   const west = westIncomplete & ~allPiecesOfColor;
 
   const rookMoves = north | east | south | west;
+
+  if (query === "squares") return rookMoves;
+
   const moves = [...encodeMoves(piece, rookMoves, 0, 0, 0, 0)];
   return moves;
 }
@@ -324,7 +371,7 @@ function encodeMoves(
   move = move | (BigInt(indexOfFrom) << 10n);
   let currentMove;
   let indexOfTo = 0;
-  // go through each valid move and ancode it with the 'common move'
+  // go through each valid move and encode it with the 'common move'
   for (const pieceBitboard of pieceBitboards) {
     if ((pieceBitboard & bitboard) !== 0b0n) {
       currentMove = move | (BigInt(indexOfTo) << 4n);
@@ -335,48 +382,6 @@ function encodeMoves(
   return moves;
 }
 
-function generateWhitePawnMovesDef(
-  whitePawnsAll,
-  blackPieces,
-  allPieces,
-  piece,
-  blackPawns,
-  enPassantPieces,
-) {
-  const whitePawns = whitePawnsAll & piece;
-  const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
-  const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
-  const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
-  const whitePawnLeftAttacks = (whitePawns << 9n) & ~maskFile[7] & blackPieces;
-  const whitePawnRightAttacks = (whitePawns << 7n) & ~maskFile[0] & blackPieces;
-
-  const enPassantLeftPiece =
-    ((blackPawns & enPassantPieces) >> 1n) & maskRank[4] & whitePawns;
-  const enPassantRightPiece =
-    ((blackPawns & enPassantPieces) << 1n) & maskRank[4] & whitePawns;
-  let enPassantLeft = 0b0n;
-  let enPassantRight = 0b0n;
-  if (enPassantLeftPiece !== 0b0n) {
-    enPassantLeft = enPassantLeftPiece << 9n;
-  }
-  if (enPassantRightPiece !== 0b0n) {
-    enPassantRight = enPassantRightPiece << 7n;
-  }
-  const whiteMoves =
-    whiteSteps |
-    whitePawnLeftAttacks |
-    whitePawnRightAttacks |
-    enPassantLeft |
-    enPassantRight;
-  if (
-    whiteMoves >
-    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n)
-  ) {
-    return 0b0n;
-  }
-  return whiteMoves;
-}
-
 function generateWhitePawnMoves(
   whitePawnsAll,
   blackPieces,
@@ -384,8 +389,9 @@ function generateWhitePawnMoves(
   piece,
   blackPawns,
   enPassantPieces,
+  query = "",
 ) {
-  const whitePawns = whitePawnsAll & piece;
+  const whitePawns = query === "squares" ? piece : whitePawnsAll & piece;
   const whitePawnOneStep = (whitePawns << 8n) & ~allPieces;
   const whitePawnTwoStep = (whitePawnOneStep << 8n) & maskRank[3] & ~allPieces;
   const whiteSteps = whitePawnOneStep | whitePawnTwoStep;
@@ -422,14 +428,34 @@ function generateWhitePawnMoves(
   ) {
     return [];
   }
+  let promotionFlag = 0;
+  if (
+    (BigInt(
+      2 ** 64 +
+        2 ** 63 +
+        2 ** 62 +
+        2 ** 61 +
+        2 ** 60 +
+        2 ** 59 +
+        2 ** 58 +
+        2 ** 57,
+    ) &
+      whiteMoves) !==
+    0b0n
+  ) {
+    promotionFlag = 1;
+  }
 
+  if (query === "squares") {
+    return whitePawnLeftAttacks | whitePawnRightAttacks;
+  }
   const moves = [
-    ...encodeMoves(piece, whitePawnOneStep, 0, 0, 0, 0),
-    ...encodeMoves(piece, whitePawnTwoStep, 0, 1, 0, 0),
+    ...encodeMoves(piece, whitePawnOneStep, promotionFlag, 0, 0, 0),
+    ...encodeMoves(piece, whitePawnTwoStep, promotionFlag, 1, 0, 0),
     ...encodeMoves(
       piece,
       whitePawnLeftAttacks | whitePawnRightAttacks,
-      0,
+      promotionFlag,
       0,
       0,
       0,
@@ -440,42 +466,6 @@ function generateWhitePawnMoves(
   return moves;
 }
 
-function generateBlackPawnMovesDef(
-  blackPawnsAll,
-  whitePieces,
-  allPieces,
-  piece,
-  whitePawns,
-  enPassantPieces,
-) {
-  const blackPawns = blackPawnsAll & piece;
-  const blackPawnOneStep = (blackPawns >> 8n) & ~allPieces;
-  const blackPawnTwoStep = (blackPawnOneStep >> 8n) & maskRank[4] & ~allPieces;
-  const blackSteps = blackPawnOneStep | blackPawnTwoStep;
-  const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
-  const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
-  const enPassantLeftPiece =
-    ((whitePawns & enPassantPieces) << 1n) & maskRank[3] & blackPawns;
-  const enPassantRightPiece =
-    ((whitePawns & enPassantPieces) >> 1n) & maskRank[3] & blackPawns;
-  let enPassantLeft = 0b0n;
-  let enPassantRight = 0b0n;
-  if (enPassantLeftPiece !== 0b0n) {
-    enPassantLeft = enPassantLeftPiece >> 9n;
-  }
-  if (enPassantRightPiece !== 0b0n) {
-    enPassantRight = enPassantRightPiece >> 7n;
-  }
-  const blackMoves =
-    blackSteps |
-    blackPawnLeftAttacks |
-    blackPawnRightAttacks |
-    enPassantLeft |
-    enPassantRight;
-
-  return blackMoves;
-}
-
 function generateBlackPawnMoves(
   blackPawnsAll,
   whitePieces,
@@ -483,11 +473,11 @@ function generateBlackPawnMoves(
   piece,
   whitePawns,
   enPassantPieces,
+  query = "",
 ) {
-  const blackPawns = blackPawnsAll & piece;
+  const blackPawns = query === "squares" ? piece : blackPawnsAll & piece;
   const blackPawnOneStep = (blackPawns >> 8n) & ~allPieces;
   const blackPawnTwoStep = (blackPawnOneStep >> 8n) & maskRank[4] & ~allPieces;
-  const blackSteps = blackPawnOneStep | blackPawnTwoStep;
   const blackPawnLeftAttacks = (blackPawns >> 9n) & ~maskFile[0] & whitePieces;
   const blackPawnRightAttacks = (blackPawns >> 7n) & ~maskFile[7] & whitePieces;
   const enPassantLeftPiece =
@@ -501,6 +491,10 @@ function generateBlackPawnMoves(
   }
   if (enPassantRightPiece !== 0b0n) {
     enPassantRight = enPassantRightPiece >> 7n;
+  }
+
+  if (query === "squares") {
+    return blackPawnLeftAttacks | blackPawnRightAttacks;
   }
 
   let moves = [
@@ -525,7 +519,11 @@ function generateWhiteKingMovesNoCheckFilter(
   whiteKing,
   allWhitePieces,
   canCastle = true,
+  query = "",
 ) {
+  if (query === "squares") {
+    allWhitePieces = 0b0n;
+  }
   let whiteKingDown = (whiteKing >> 8n) & ~allWhitePieces;
   let whiteKingUp = (whiteKing << 8n) & ~allWhitePieces;
   let whiteKingLeft = (whiteKing << 1n) & ~maskFile[7] & ~allWhitePieces;
@@ -555,13 +553,22 @@ function generateWhiteKingMovesNoCheckFilter(
     whiteKingUpRight;
 
   let castleMoves = 0b0n;
-  if (canCastle.short) {
+
+  const shortBetween = (whiteKing >> 1n) | (whiteKing >> 2n);
+  const longBetween = (whiteKing << 1n) | (whiteKing << 2n) | (whiteKing << 3n);
+
+  if (canCastle.short && (shortBetween & allWhitePieces) === 0b0n) {
     castleMoves = castleMoves | (whiteKing >> 2n);
   }
-  if (canCastle.long) {
+
+  if (canCastle.long && (longBetween & allWhitePieces) === 0b0n) {
     castleMoves = castleMoves | (whiteKing << 2n);
   }
 
+  if (query === "squares") {
+    console.log(whiteMoves);
+    return whiteMoves;
+  }
   const moves = [
     ...encodeMoves(whiteKing, whiteMoves, 0, 0, 0, 0),
     ...encodeMoves(whiteKing, castleMoves, 0, 0, 1, 0),
@@ -569,59 +576,13 @@ function generateWhiteKingMovesNoCheckFilter(
   return moves;
 }
 
-function generateBlackKingMovesNoCheckFilter(
-  blackKing,
-  allBlackPieces,
-  canCastle = true,
-) {
-  let blackKingDown = (blackKing << 8n) & ~allBlackPieces;
-  let blackKingUp = (blackKing >> 8n) & ~allBlackPieces;
-  let blackKingLeft = (blackKing >> 1n) & ~maskFile[0] & ~allBlackPieces;
-  let blackKingRight = (blackKing << 1n) & ~maskFile[7] & ~allBlackPieces;
-  let blackKingUpLeft = (blackKing >> 9n) & ~maskFile[0] & ~allBlackPieces;
-  let blackKingUpRight = (blackKing >> 7n) & ~maskFile[7] & ~allBlackPieces;
-  let blackKingDownLeft = (blackKing << 7n) & ~maskFile[0] & ~allBlackPieces;
-  let blackKingDownRight = (blackKing << 9n) & ~maskFile[7] & ~allBlackPieces;
-  let max =
-    BigInt(0b1100000000000000000000000000000000000000000000000000000000000000n);
-  blackKingDown = blackKingDown > max ? 0b0n : blackKingDown;
-  blackKingUp = blackKingUp > max ? 0b0n : blackKingUp;
-  blackKingLeft = blackKingLeft > max ? 0b0n : blackKingLeft;
-  blackKingRight = blackKingRight > max ? 0b0n : blackKingRight;
-  blackKingUpLeft = blackKingUpLeft > max ? 0b0n : blackKingUpLeft;
-  blackKingUpRight = blackKingUpRight > max ? 0b0n : blackKingUpRight;
-  blackKingDownLeft = blackKingDownLeft > max ? 0b0n : blackKingDownLeft;
-  blackKingDownRight = blackKingDownRight > max ? 0b0n : blackKingDownRight;
-  const blackMoves =
-    blackKingDown |
-    blackKingUp |
-    blackKingLeft |
-    blackKingRight |
-    blackKingDownLeft |
-    blackKingDownRight |
-    blackKingUpLeft |
-    blackKingUpRight;
-  let castleMoves = 0b0n;
-  if (canCastle.short) {
-    castleMoves = castleMoves | (blackKing >> 2n);
-  }
-  if (canCastle.long) {
-    castleMoves = castleMoves | (blackKing << 2n);
-  }
-  const moves = [
-    ...encodeMoves(blackKing, blackMoves, 0, 0, 0, 0),
-    ...encodeMoves(blackKing, castleMoves, 0, 0, 1, 0),
-  ];
-  return moves;
-}
-
-function generateKnightMoves(knights, allPiecesOfColor, piece) {
+function generateKnightMoves(knights, allPiecesOfColor, piece, query = "") {
   //        3     2
   //      4          1
   //
   //      5          8
   //        6     7
-  const knight = knights & piece;
+  const knight = query === "squares" ? piece : knights & piece;
   let knightOne =
     (knight << 6n) & ~maskFile[1] & ~maskFile[0] & ~allPiecesOfColor;
   let knightTwo = (knight << 15n) & ~maskFile[0] & ~allPiecesOfColor;
@@ -654,18 +615,268 @@ function generateKnightMoves(knights, allPiecesOfColor, piece) {
     knightSix |
     knightSeven |
     knightEight;
+
+  if (query === "squares") {
+    return knightMoves;
+  }
   const moves = [...encodeMoves(piece, knightMoves, 0, 0, 0, 0)];
   return moves;
 }
 
-export {
-  generateBlackPawnMoves,
-  generateWhitePawnMoves,
-  pieceBitboards,
-  generateBlackKingMovesNoCheckFilter,
-  generateWhiteKingMovesNoCheckFilter,
-  generateKnightMoves,
-  generateRookMoves,
-  generateBishopMoves,
-  generateQueenMoves,
-};
+function generatePseudoLegalMoves(piece, square, bitboard, metadata, thequery) {
+  const whitePieces =
+    bitboard["wP"] |
+    bitboard["wN"] |
+    bitboard["wR"] |
+    bitboard["wB"] |
+    bitboard["wK"] |
+    bitboard["wQ"];
+  const blackPieces =
+    bitboard["bP"] |
+    bitboard["bN"] |
+    bitboard["bR"] |
+    bitboard["bB"] |
+    bitboard["bK"] |
+    bitboard["bQ"];
+  const allPieces = whitePieces | blackPieces;
+  const enPassantPieces = metadata["enPassantPiece"];
+  const canCastle = metadata["canCastle"];
+
+  switch (piece) {
+    case "wP":
+      return generateWhitePawnMoves(
+        bitboard["wP"],
+        blackPieces,
+        allPieces,
+        square,
+        bitboard["bP"],
+        enPassantPieces,
+        thequery,
+      );
+
+    case "wB":
+      return generateBishopMoves(
+        allPieces,
+        whitePieces,
+        bitboard["wB"],
+        square,
+        thequery,
+      );
+
+    case "wN":
+      return generateKnightMoves(bitboard["wN"], whitePieces, square, thequery);
+
+    case "wR":
+      return generateRookMoves(
+        allPieces,
+        whitePieces,
+        bitboard["wR"],
+        square,
+        thequery,
+      );
+
+    case "wK":
+      return generateWhiteKingMovesNoCheckFilter(
+        bitboard["wK"],
+        whitePieces,
+        canCastle,
+        thequery,
+      );
+
+    case "wQ":
+      return generateQueenMoves(
+        allPieces,
+        whitePieces,
+        bitboard["wQ"],
+        square,
+        thequery,
+      );
+
+    case "bP":
+      const moves = generateBlackPawnMoves(
+        bitboard["bP"],
+        whitePieces,
+        allPieces,
+        square,
+        bitboard["wP"],
+        enPassantPieces,
+        thequery,
+      );
+      return moves;
+
+    case "bB":
+      return generateBishopMoves(
+        allPieces,
+        blackPieces,
+        bitboard["bB"],
+        square,
+        thequery,
+      );
+
+    case "bN":
+      let movies = generateKnightMoves(
+        bitboard["bN"],
+        blackPieces,
+        square,
+        thequery,
+      );
+      return movies;
+    case "bR":
+      return generateRookMoves(
+        allPieces,
+        blackPieces,
+        bitboard["bR"],
+        square,
+        thequery,
+      );
+
+    case "bK":
+      return generateWhiteKingMovesNoCheckFilter(
+        bitboard["bK"],
+        blackPieces,
+        canCastle,
+        thequery,
+      );
+
+    case "bQ":
+      return generateQueenMoves(
+        allPieces,
+        blackPieces,
+        bitboard["bQ"],
+        square,
+        thequery,
+      );
+
+    default:
+      console.log("I have not programmed the moves for this piece type yet.");
+  }
+}
+
+function printSquares(squares) {
+  const squaresStringIncomplete = squares.toString(2);
+  const squaresString =
+    "0".repeat(64 - squaresStringIncomplete.length) + squaresStringIncomplete;
+  console.log("------------------------------");
+  let row = "";
+  for (let i = 0; i <= squaresString.length; i++) {
+    if (row.length == 16) {
+      let rowNum = Math.floor(i / 8);
+      console.log(rowNum + " " + row);
+      row = "";
+    }
+    if (squaresString[i] === "0") {
+      row = row + " 0";
+    } else {
+      row = row + " 1";
+    }
+  }
+}
+
+function isSquareAttacked(pieceBB, bitboard, side) {
+  const pieceTypes = ["R", "B", "N", "K", "Q", "P"];
+  const defaultMetadata = {
+    canCastle: { short: false, long: false },
+    enPassantPiece: 0b0n,
+    side: side,
+  };
+  const opponentSide = side === "w" ? "b" : "w";
+  for (let i = 0; i < pieceTypes.length; i++) {
+    const piece = side + pieceTypes[i];
+    const opponentPiece = opponentSide + pieceTypes[i];
+    const kingReplacedBB = structuredClone(bitboard);
+    if (piece !== side + "K") {
+      kingReplacedBB[piece] =
+        kingReplacedBB[piece] | kingReplacedBB[side + "K"];
+      kingReplacedBB[side + "K"] = 0b0n;
+    }
+    const pseudoLegalMoves = generatePseudoLegalMoves(
+      piece,
+      pieceBB,
+      kingReplacedBB,
+      defaultMetadata,
+      "squares",
+    );
+
+    if (opponentPiece === "bP") {
+      console.log("LEGAL MOVES");
+      printSquares(pseudoLegalMoves);
+      console.log("OPPONENT PIECD");
+      printSquares(bitboard[opponentPiece]);
+    }
+
+    if ((pseudoLegalMoves & bitboard[opponentPiece]) !== 0b0n) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function generateLegalMoves(piece, square, originalBitboard, originalMetadata) {
+  const metadata = structuredClone(originalMetadata);
+  const bitboard = structuredClone(originalBitboard);
+
+  const pseudoLegalMoves = generatePseudoLegalMoves(
+    piece,
+    square,
+    bitboard,
+    metadata,
+  );
+
+  const side = metadata["side"];
+  let legalMoves = [];
+  const pseudoLegalMovesLength = pseudoLegalMoves ? pseudoLegalMoves.length : 0;
+  let isKingAttackedNow = isSquareAttacked(
+    bitboard[side + "K"],
+    structuredClone(bitboard),
+    side,
+  );
+
+  const king = bitboard[side + "K"];
+  const castlingLongBetweenSquares = [king << 1n, king << 2n, king << 3n];
+  const castlingShortBetweenSquares = [king >> 1n, king >> 2n];
+
+  for (let i = 0; i < pseudoLegalMovesLength; i++) {
+    if ((pseudoLegalMoves[i] & 0b0000000000000010n) !== 0b0n) {
+      if (isKingAttackedNow) {
+        continue;
+      } else {
+        let isAttacked = false;
+        if ((pseudoLegalMoves[i] & (0b111111n << 10n)) < king) {
+          castlingShortBetweenSquares.forEach((square) => {
+            if (isSquareAttacked(square, structuredClone(bitboard), side)) {
+              isAttacked = true;
+            }
+          });
+          if (isAttacked) continue;
+        } else if ((pseudoLegalMoves[i] & (0b111111n << 10n)) > king) {
+          castlingLongBetweenSquares.forEach((square) => {
+            if (isSquareAttacked(square, structuredClone(bitboard), side)) {
+              isAttacked = true;
+            }
+          });
+          if (isAttacked) continue;
+        }
+      }
+    }
+    const tempBitboard = structuredClone(bitboard);
+    const defaultMetadata = {
+      canCastle: { short: false, long: false },
+      enPassantPieces: 0b0n,
+    };
+    const { newBitboard } = makeMove(
+      tempBitboard,
+      piece,
+      pseudoLegalMoves[i],
+      defaultMetadata,
+    );
+
+    const kingBitboard = newBitboard[side + "K"];
+    const isKingAttacked = isSquareAttacked(kingBitboard, newBitboard, side);
+
+    if (!isKingAttacked) legalMoves.push(pseudoLegalMoves[i]);
+  }
+  return legalMoves;
+}
+
+export { pieceBitboards, generateLegalMoves };

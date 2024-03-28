@@ -1,24 +1,10 @@
 import { useEffect, useReducer, useState } from "react";
 import Square from "./Square";
-import {
-  generateBlackPawnMoves,
-  generateWhitePawnMoves,
-  generateBlackKingMovesNoCheckFilter,
-  pieceBitboards,
-  generateWhiteKingMovesNoCheckFilter,
-  generateKnightMoves,
-  generateRookMoves,
-  generateBishopMoves,
-  generateQueenMoves,
-} from "./MoveGen/moveGeneration";
-generateBlackPawnMoves;
-generateWhitePawnMoves;
-pieceBitboards;
+import { generateLegalMoves, pieceBitboards } from "./MoveGen/moveGeneration";
 import {
   doesContainSubArray,
   arraysEqual,
   binaryStringToBigInt,
-  toBitboard,
   bitboardToArray,
   getSquaresFromMoves,
 } from "./utils.js";
@@ -53,8 +39,8 @@ const initialBoardAction = {
 
 const initialMetadata = {
   canCastle: { short: true, long: true },
-  canCastleLong: true,
   enPassantPiece: 0b0n,
+  side: "w",
 };
 
 function ChessBoard() {
@@ -64,15 +50,15 @@ function ChessBoard() {
   const [state, dispatch] = useReducer(reducer, initialBoardAction);
   const [legalMoves, setLegalMoves] = useState([]);
   const [legalSquares, setLegalSquares] = useState([]);
-
+  const [turn, setTurn] = useState("w");
+  const [halfMoveCount, setHalfMoveCount] = useState(1);
+  const turns = ["w", "b"];
   useEffect(() => {
     if (state.isPondering) {
-      const legalMoves = generateLegalMoves(
-        state.piece,
-        state.from,
-        board,
-        metadata,
-      );
+      const pieceBitboard = pieceBitboards[63 - state.from];
+      const legalMoves = state.piece.includes(turn)
+        ? generateLegalMoves(state.piece, pieceBitboard, bitboard, metadata)
+        : [];
       setLegalMoves(legalMoves);
       setLegalSquares(getSquaresFromMoves(legalMoves));
     }
@@ -90,6 +76,9 @@ function ChessBoard() {
       setMetadata(newMetadata);
       dispatch({ type: "RESET" });
       setLegalSquares([]);
+      const newTurn = turns[halfMoveCount % 2];
+      setTurn(newTurn);
+      setHalfMoveCount((halfMoveCount) => halfMoveCount + 1);
     } else if (!state.isPondering) {
       setLegalSquares([]);
     }
@@ -156,152 +145,6 @@ function reducer(state, action) {
       throw new Error("Unrecognized action type!");
     }
   }
-}
-
-function generateLegalMoves(piece, index, board, metadata) {
-  let legalMoves = [];
-  // the regex in allPieces matches all non space characters
-  const allPieces = toBitboard(/^(?!\s*$).+/, board);
-  const pieceBB = pieceBitboards[63 - index];
-  const whitePieces = toBitboard(/w/, board);
-  const whitePawns = toBitboard(/wP/, board);
-  const blackPieces = toBitboard(/b/, board);
-  const blackPawns = toBitboard(/bP/, board);
-  const enPassantPiece = metadata["enPassantPiece"];
-  const canCastle = metadata["canCastle"];
-  switch (piece) {
-    case "wP": {
-      const legalMoves = generateWhitePawnMoves(
-        whitePawns,
-        blackPieces,
-        allPieces,
-        pieceBB,
-        blackPawns,
-        enPassantPiece,
-      );
-      return legalMoves;
-    }
-    case "bP": {
-      const legalMoves = generateBlackPawnMoves(
-        blackPawns,
-        whitePieces,
-        allPieces,
-        pieceBB,
-        whitePawns,
-        enPassantPiece,
-      );
-      return legalMoves;
-    }
-    case "bK": {
-      const blackKing = toBitboard(/bK/, board);
-      const legalMoves = generateBlackKingMovesNoCheckFilter(
-        blackKing,
-        blackPieces,
-        canCastle,
-      );
-
-      return legalMoves;
-    }
-    case "wK": {
-      const whiteKing = toBitboard(/wK/, board);
-      const legalMoves = generateWhiteKingMovesNoCheckFilter(
-        whiteKing,
-        whitePieces,
-        canCastle,
-      );
-
-      return legalMoves;
-    }
-    case "wN": {
-      const whiteKnights = toBitboard(/wN/, board);
-      const legalMoves = generateKnightMoves(
-        whiteKnights,
-        whitePieces,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-    case "bN": {
-      const blackKnights = toBitboard(/bN/, board);
-      const legalMoves = generateKnightMoves(
-        blackKnights,
-        blackPieces,
-        pieceBB,
-      );
-
-      return legalMoves;
-    }
-    case "wR": {
-      const rooks = toBitboard(/wR/, board);
-      const legalMoves = generateRookMoves(
-        allPieces,
-        whitePieces,
-        rooks,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-
-    case "bR": {
-      const rooks = toBitboard(/bR/, board);
-      const legalMoves = generateRookMoves(
-        allPieces,
-        blackPieces,
-        rooks,
-        pieceBB,
-      );
-
-      return legalMoves;
-    }
-
-    case "wB": {
-      const bishops = toBitboard(/wB/, board);
-      const legalMoves = generateBishopMoves(
-        allPieces,
-        whitePieces,
-        bishops,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-
-    case "bB": {
-      const bishops = toBitboard(/bB/, board);
-      const legalMoves = generateBishopMoves(
-        allPieces,
-        blackPieces,
-        bishops,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-
-    case "wQ": {
-      const queens = toBitboard(/wQ/, board);
-      const legalMoves = generateQueenMoves(
-        allPieces,
-        whitePieces,
-        queens,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-
-    case "bQ": {
-      const queens = toBitboard(/bQ/, board);
-      const legalMoves = generateQueenMoves(
-        allPieces,
-        blackPieces,
-        queens,
-        pieceBB,
-      );
-      return legalMoves;
-    }
-    default: {
-      console.log("I haven't programmed legal moves for this piece type yet!");
-    }
-  }
-  return legalMoves;
 }
 
 export default ChessBoard;

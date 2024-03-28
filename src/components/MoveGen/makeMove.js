@@ -21,7 +21,6 @@ function capturePiece(bitboard, captureSquareBitboard) {
   return newBitboard;
 }
 
-capturePiece;
 function makeMove(bitboard, piece, move, metadata) {
   const { castling, enpassant, doublepush, promotion } = parseFlags(move);
   let newMetadata = metadata;
@@ -40,12 +39,12 @@ function makeMove(bitboard, piece, move, metadata) {
     newMetadata["enPassantPiece"] = 0b0n;
   }
 
+  newMetadata["side"] = metadata["side"] === "w" ? "b" : "w";
+
   if (piece.includes("K")) {
-    console.log("KING TOUCHED");
     newMetadata["canCastle"]["short"] = false;
     newMetadata["canCastle"]["long"] = false;
   } else if (piece.includes("R")) {
-    console.log("ROOK TOUCHED");
     newMetadata["canCastle"]["short"] =
       (piece.includes("b") && fromSquare === 56) ||
       (piece.includes("w") && fromSquare === 0)
@@ -69,7 +68,13 @@ function makeMove(bitboard, piece, move, metadata) {
 
   newBitboard = capturePiece(newBitboard, captureSquareBitboard);
 
-  newBitboard[piece] = newBitboard[piece] | pieceBitboards[toSquare];
+  if (promotion) {
+    newBitboard[piece] = newBitboard[piece] & ~pieceBitboards[toSquare];
+    const queen = piece === "wP" ? "wQ" : "bQ";
+    newBitboard[queen] = newBitboard[queen] | pieceBitboards[toSquare];
+  } else {
+    newBitboard[piece] = newBitboard[piece] | pieceBitboards[toSquare];
+  }
   if (castling) {
     const rook = piece === "wK" ? "wR" : "bR";
     const isLongCastle = toSquare > fromSquare;
