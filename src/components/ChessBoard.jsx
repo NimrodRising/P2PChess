@@ -97,10 +97,14 @@ function ChessBoard() {
   }
 
   return (
-    <div className="border w-2/3 max-w-screen-sm border-black">
-      <div className=" grid grid-cols-8">
+    <div className="max-w-xl w-full max-w-screen-w">
+      <div>
+        <aside>Player 2</aside>
+      </div>
+      <div className="rounded-sm overflow-hidden grid grid-cols-8">
         {board.map((piece, index) => (
           <Square
+            isPondering={state.isPondering}
             isLegal={legalSquares.includes(index)}
             handleDrop={handleDrop}
             handleGrab={handleGrab}
@@ -113,6 +117,9 @@ function ChessBoard() {
             }}
           />
         ))}
+      </div>
+      <div>
+        <aside>Player 1</aside>
       </div>
     </div>
   );

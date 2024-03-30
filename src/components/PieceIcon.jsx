@@ -9,7 +9,7 @@ const initialState = {
   newPosition: [0, 0],
 };
 
-function PieceIcon({ piece }) {
+function PieceIcon({ piece, isOdd, isLegal }) {
   // reducer
   const [state, dispatch] = useReducer(reducer, initialState);
   // custom hooks
@@ -45,22 +45,43 @@ function PieceIcon({ piece }) {
     }
   }, [state.isDraggingPiece, userPosition, state.domRect]);
 
+  const backgroundColor = isOdd ? "bg-blue-400" : "bg-white";
+
   const style = state.isDraggingPiece
     ? {
         transform: `translate(${state.newPosition[0]}px, ${state.newPosition[1]}px)`,
       }
     : null;
-
-  return piece ? (
-    <img
-      style={style}
-      draggable="false"
-      onMouseDown={handleMouseDown}
-      className={`w-full select-none image ${state.isDraggingPiece ? "pointer-events-none" : ""}`}
-      src={pieceIcon}
-      alt=""
-    />
-  ) : null;
+  if (isLegal) {
+    return piece ? (
+      <div className="flex relative items-center justify-center w-full aspect-square rounded-full bg-[rgba(1,1,1,0.2)]">
+        <div
+          className={`w-[87%] absolute aspect-square rounded-full ${backgroundColor}`}
+        ></div>
+        <img
+          style={style}
+          draggable="false"
+          onMouseDown={handleMouseDown}
+          className={`w-[95%] opacity-100 absolute select-none image bg-transparent ${state.isDraggingPiece ? "pointer-events-none" : ""}`}
+          src={pieceIcon}
+          alt=""
+        />
+      </div>
+    ) : (
+      <div className="flex items-center justify-center w-[25%] opacity-30 aspect-square rounded-full bg-black"></div>
+    );
+  } else {
+    return (
+      <img
+        style={style}
+        draggable="false"
+        onMouseDown={handleMouseDown}
+        className={`w-[95%] z-[999] select-none image bg-transparent ${state.isDraggingPiece ? "pointer-events-none" : ""}`}
+        src={pieceIcon}
+        alt=""
+      />
+    );
+  }
 }
 
 function updatePosition(left, width, top, height, userPosition) {

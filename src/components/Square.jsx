@@ -1,8 +1,11 @@
 import { useState } from "react";
 import PieceIcon from "./PieceIcon";
 
-function Square({ square, handleGrab, handleDrop, isLegal }) {
+function Square({ square, handleGrab, handleDrop, isLegal, isPondering }) {
   const [isHovered, setIsHovered] = useState(false);
+
+  const backgroundColor =
+    (square.file + square.rank) % 2 !== 0 ? "bg-blue-400" : "bg-white";
 
   return (
     <div
@@ -13,15 +16,20 @@ function Square({ square, handleGrab, handleDrop, isLegal }) {
         if (isHovered) handleDrop(square.index);
       }}
       onMouseDown={() => handleGrab(square.index, square.piece)}
-      className={`aspect-square w-full flex items-center justify-center m-0 p-0 ${
-        (square.file + square.rank) % 2 !== 0 && !isLegal ? "bg-blue-400" : ""
-      } ${isLegal ? "bg-red-100" : ""}`}
+      className={`aspect-square flex items-center justify-center ${backgroundColor} ${isLegal ? "bg-red" : ""} ${isHovered && isPondering ? "shadow-[0_0_0_3px_rgba(100,100,100,1)_inset]" : ""}`}
     >
-      {" "}
-      <PieceIcon
-        piece={square.piece}
-        isOdd={(square.file + square.rank) % 2 !== 0}
-      />
+      {isLegal ? (
+        <PieceIcon
+          piece={square.piece}
+          isOdd={(square.file + square.rank) % 2 !== 0}
+          isLegal={isLegal}
+        />
+      ) : (
+        <PieceIcon
+          piece={square.piece}
+          isOdd={(square.file + square.rank) % 2 !== 0}
+        />
+      )}
     </div>
   );
 }
